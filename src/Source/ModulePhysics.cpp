@@ -26,12 +26,29 @@ bool ModulePhysics::Start()
 
 	world = new b2World(b2Vec2(GRAVITY_X, -GRAVITY_Y));
 
+
+	// Spawn main Pinball body
+	b2BodyDef pinballBody;
+	pinballBody.type = b2_staticBody;
+
+	//pinballBody.position.Set(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+	pinballBody.position.Set(12, 7);
+
+	b2Body* p = world->CreateBody(&pinballBody);
+
+	b2PolygonShape pinballShape;
+	pinballShape.SetAsBox(4, 6);
+
+	b2FixtureDef pinballFixture;
+	pinballFixture.shape = &pinballShape;
+	pinballFixture.density = 1.0f;
+	p->CreateFixture(&pinballFixture);
+
 	return true;
 }
 
 update_status ModulePhysics::PreUpdate()
 {
-	// TODO 3: Update the simulation ("step" the world)
 	world->Step(1.0f / 60.0f, 8, 3);
 
 	return UPDATE_CONTINUE;
