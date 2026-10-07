@@ -12,6 +12,8 @@
 ModulePhysics::ModulePhysics(Application* app, bool start_enabled) : Module(app, start_enabled)
 {
 	world = NULL;
+	ground = NULL;
+	mouse_joint = NULL;
 	debug = true;
 }
 
@@ -26,8 +28,10 @@ bool ModulePhysics::Start()
 
 	world = new b2World(b2Vec2(GRAVITY_X, -GRAVITY_Y));
 
+	b2BodyDef bd;
+	ground = world->CreateBody(&bd);
+
 	CreatePinball(world);
-	
 
 	return true;
 }
@@ -66,8 +70,16 @@ update_status ModulePhysics::PostUpdate()
 
 	if (!debug)
 	{
+		if (mouse_joint != NULL)
+		{
+			world->DestroyJoint(mouse_joint);
+			mouse_joint = NULL;
+		}
 		return UPDATE_CONTINUE;
 	}
+
+	b2Vec2 mouse_position(PIXEL_TO_METER(GetMouseX()), PIXEL_TO_METER(GetMouseY()));
+	b2Body* body_clicked = NULL;
 
 	// Bonus code: this will iterate all objects in the world and draw the circles
 	for (b2Body* b = world->GetBodyList(); b; b = b->GetNext())
@@ -138,8 +150,44 @@ update_status ModulePhysics::PostUpdate()
 				}
 				break;
 			}
+
+			if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && mouse_joint == NULL && body_clicked == NULL
+				&& b->GetType() == b2_dynamicBody && f->TestPoint(mouse_position))
+			{
+				body_clicked = b;
+			}
 		}
 	}
+
+	if (body_clicked != NULL)
+	{
+		b2MouseJointDef def;
+		def.bodyA = ground;
+		def.bodyB = body_clicked;
+		def.target = mouse_position;
+		def.maxForce = 100.0f * body_clicked->GetMass();
+		b2LinearStiffness(def.stiffness, def.damping, 5.0f, 0.7f, def.bodyA, def.bodyB); // 5 Hz, damping ratio 0.7
+
+		mouse_joint = (b2MouseJoint*)world->CreateJoint(&def);
+		body_clicked->SetAwake(true);
+	}
+
+	if (mouse_joint != NULL && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+	{
+		mouse_joint->SetTarget(mouse_position);
+
+		b2Vec2 anchor_a = mouse_joint->GetAnchorA(); // the target
+		b2Vec2 anchor_b = mouse_joint->GetAnchorB(); // the point of the body we clicked
+		DrawLine(METER_TO_PIXEL(anchor_a.x), METER_TO_PIXEL(anchor_a.y), METER_TO_PIXEL(anchor_b.x), METER_TO_PIXEL(anchor_b.y), RED);
+	}
+
+	// TODO 4: If the player releases the mouse button, destroy the joint
+	if (mouse_joint != NULL && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
+	{
+		world->DestroyJoint(mouse_joint);
+		mouse_joint = NULL;
+	}
+
 
 	return UPDATE_CONTINUE;
 }

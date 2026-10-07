@@ -35,7 +35,8 @@ public:
 private:
 
 	bool debug;
-
-	// TODO 2: Create a private variable for the world
 	b2World* world;
+
+	b2Body* ground;
+	b2MouseJoint* mouse_joint;
 };
