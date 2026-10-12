@@ -235,11 +235,11 @@ void ModulePhysics::CreatePinball(b2World* world)
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	b2BodyDef bumperBody;
-	bumperBody.type = b2_staticBody;
+	bumperBody.type = b2_dynamicBody;
 
 	bumperBody.position.Set(PIXEL_TO_METER(450), PIXEL_TO_METER(550));
 
-	b2Body* b = world->CreateBody(&bumperBody);
+	b2Body* bumper = world->CreateBody(&bumperBody);
 
 	b2Vec2 verticesBumper[4];
 	verticesBumper[0].Set(PIXEL_TO_METER(0.0f), PIXEL_TO_METER(0.0f));
@@ -247,15 +247,41 @@ void ModulePhysics::CreatePinball(b2World* world)
 	verticesBumper[2].Set(PIXEL_TO_METER(104.904f), PIXEL_TO_METER(118.301f));
 	verticesBumper[3].Set(PIXEL_TO_METER(-25.0f), PIXEL_TO_METER(43.301f));
 	
-	b2ChainShape bumperShape;
-	bumperShape.CreateLoop(verticesBumper, 4);
+	b2PolygonShape bumperShape;
+	bumperShape.Set(verticesBumper, 4);
 
 	b2FixtureDef bumperFixture;
 	bumperFixture.shape = &bumperShape;
 	bumperFixture.density = 1.0f;
 	bumperFixture.friction = 0.0f;
 	bumperFixture.restitution = 1.0f;
-	b->CreateFixture(&bumperFixture);
+	bumper->CreateFixture(&bumperFixture);
+
+
+
+	b2BodyDef anchorDef1;
+	anchorDef1.type = b2_staticBody;
+
+	anchorDef1.position.Set(PIXEL_TO_METER(450), PIXEL_TO_METER(550));
+
+	b2Body* anchor1 = world->CreateBody(&anchorDef1);
+
+	b2CircleShape anchorShape;
+	anchorShape.m_radius = PIXEL_TO_METER(8.0f);
+
+	b2FixtureDef anchorFixture;
+	anchorFixture.shape = &anchorShape;
+	anchorFixture.density = 0.0f;                  
+	anchor1->CreateFixture(&anchorFixture);
+
+	b2RevoluteJointDef revoluteJointBumper;
+	revoluteJointBumper.Initialize(anchor1, bumper, anchor1->GetWorldCenter());
+
+	revoluteJointBumper.enableLimit = true;
+	revoluteJointBumper.lowerAngle = -60 * b2_pi / 180;
+	revoluteJointBumper.upperAngle = 30 * b2_pi / 180;
+
+	world->CreateJoint(&revoluteJointBumper);
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -264,7 +290,7 @@ void ModulePhysics::CreatePinball(b2World* world)
 
 	bumperBody2.position.Set(PIXEL_TO_METER(695), PIXEL_TO_METER(550));
 
-	b2Body* b2Bumper = world->CreateBody(&bumperBody2);
+	b2Body* bumper2 = world->CreateBody(&bumperBody2);
 
 	b2Vec2 verticesBumper2[4];
 	verticesBumper2[0].Set(PIXEL_TO_METER(25.0f), PIXEL_TO_METER(118.301f));
@@ -280,5 +306,5 @@ void ModulePhysics::CreatePinball(b2World* world)
 	bumperFixture2.density = 1.0f;
 	bumperFixture2.friction = 0.0f;
 	bumperFixture2.restitution = 1.0f;
-	b2Bumper->CreateFixture(&bumperFixture2);
+	bumper2->CreateFixture(&bumperFixture2);
 }

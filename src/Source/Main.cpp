@@ -22,6 +22,11 @@ int main(int argc, char ** argv)
 	main_states state = MAIN_CREATION;
 	Application* App = NULL;
 
+	// He tenido que poner este SetTargetFPS porque en mi 
+	// pc me iba a tantos FPS que la fisica se rompia
+	// Nil
+	SetTargetFPS(60);
+
 	while (state != MAIN_EXIT)
 	{
 		switch (state)
