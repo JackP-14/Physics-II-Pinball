@@ -55,7 +55,7 @@ update_status ModulePhysics::PostUpdate()
 		b2Body* b = world->CreateBody(&body);
 
 		b2CircleShape shape;
-		shape.m_radius = PIXEL_TO_METER(25);
+		shape.m_radius = PIXEL_TO_METER(10);
 
 		b2FixtureDef fixture;
 		fixture.shape = &shape;
@@ -79,6 +79,15 @@ update_status ModulePhysics::PostUpdate()
 	else
 	{
 		bumperJoint2->SetMotorSpeed(-60.0f);
+	}
+
+	if (IsKeyDown(KEY_S))
+	{
+		shooterSpringJoint->SetMotorSpeed(3.0f);
+	}
+	else
+	{
+		shooterSpringJoint->SetMotorSpeed(-60.0f);
 	}
 
 	if (IsKeyPressed(KEY_F1))
@@ -252,21 +261,44 @@ void ModulePhysics::CreatePinball(b2World* world)
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+	b2BodyDef esquinaBody;
+	esquinaBody.type = b2_staticBody;
+
+	esquinaBody.position.Set(pinballBody.position.x * 2 - PIXEL_TO_METER(125), pinballBody.position.y);
+
+	b2Body* eB = world->CreateBody(&esquinaBody);
+
+	b2Vec2 verticesEsquina[3];
+	verticesEsquina[0].Set(PIXEL_TO_METER(0.0f),   PIXEL_TO_METER(0.0f));
+	verticesEsquina[1].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(0.0f));
+	verticesEsquina[2].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(125.0f));
+
+	b2PolygonShape esquinaShape;
+	esquinaShape.Set(verticesEsquina, 3);
+
+	b2FixtureDef esquinaFixture;
+	esquinaFixture.shape = &esquinaShape;
+	esquinaFixture.density = 1.0f;
+	esquinaFixture.friction = 0.0f;
+	esquinaFixture.restitution = 0.2f;
+	eB->CreateFixture(&esquinaFixture);
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	b2BodyDef bumperBody;
 	bumperBody.type = b2_dynamicBody;
 
-	bumperBody.position.Set(PIXEL_TO_METER(475), PIXEL_TO_METER(450));
+	bumperBody.position.Set(PIXEL_TO_METER(525), PIXEL_TO_METER(550));
 
 	b2Body* bumper = world->CreateBody(&bumperBody);
 
-	b2Vec2 verticesBumper[4];
-	verticesBumper[0].Set(PIXEL_TO_METER(0.0f), PIXEL_TO_METER(0.0f));
-	verticesBumper[1].Set(PIXEL_TO_METER(129.904f), PIXEL_TO_METER(75.0f));
-	verticesBumper[2].Set(PIXEL_TO_METER(104.904f), PIXEL_TO_METER(118.301f));
-	verticesBumper[3].Set(PIXEL_TO_METER(-25.0f), PIXEL_TO_METER(43.301f));
-	
+	b2Vec2 verticesBumper[3];
+	verticesBumper[0].Set(PIXEL_TO_METER(-6.25f),  PIXEL_TO_METER(10.825f));
+	verticesBumper[1].Set(PIXEL_TO_METER(6.25f),   PIXEL_TO_METER(-10.825f));
+	verticesBumper[2].Set(PIXEL_TO_METER(64.952f), PIXEL_TO_METER(37.5f));    
+
 	b2PolygonShape bumperShape;
-	bumperShape.Set(verticesBumper, 4);
+	bumperShape.Set(verticesBumper, 3);
 
 	b2FixtureDef bumperFixture;
 	bumperFixture.shape = &bumperShape;
@@ -274,8 +306,6 @@ void ModulePhysics::CreatePinball(b2World* world)
 	bumperFixture.friction = 0.0f;
 	bumperFixture.restitution = 1.0f;
 	bumper->CreateFixture(&bumperFixture);
-
-
 
 	b2BodyDef anchorDef1;
 	anchorDef1.type = b2_kinematicBody;
@@ -310,18 +340,17 @@ void ModulePhysics::CreatePinball(b2World* world)
 
 	b2BodyDef bumperBody2;
 	bumperBody2.type = b2_dynamicBody;
-	bumperBody2.position.Set(PIXEL_TO_METER(825), PIXEL_TO_METER(450));   // pivot position
+	bumperBody2.position.Set(PIXEL_TO_METER(750), PIXEL_TO_METER(550));  
 
 	b2Body* bumper2 = world->CreateBody(&bumperBody2);
 
-	b2Vec2 verticesBumper2[4];
-	verticesBumper2[0].Set(PIXEL_TO_METER(0.0f),      PIXEL_TO_METER(0.0f));
-	verticesBumper2[1].Set(PIXEL_TO_METER(-129.904f), PIXEL_TO_METER(75.0f));
-	verticesBumper2[2].Set(PIXEL_TO_METER(-104.904f), PIXEL_TO_METER(118.301f));
-	verticesBumper2[3].Set(PIXEL_TO_METER(25.0f),     PIXEL_TO_METER(43.301f));
+	b2Vec2 verticesBumper2[3];
+	verticesBumper2[0].Set(PIXEL_TO_METER(6.25f),    PIXEL_TO_METER(10.825f));
+	verticesBumper2[1].Set(PIXEL_TO_METER(-6.25f),   PIXEL_TO_METER(-10.825f));
+	verticesBumper2[2].Set(PIXEL_TO_METER(-64.952f), PIXEL_TO_METER(37.5f)); 
 
 	b2PolygonShape bumperShape2;
-	bumperShape2.Set(verticesBumper2, 4);
+	bumperShape2.Set(verticesBumper2, 3);
 
 	b2FixtureDef bumperFixture2;
 	bumperFixture2.shape = &bumperShape2;
@@ -354,4 +383,50 @@ void ModulePhysics::CreatePinball(b2World* world)
 	revoluteJointBumper2.motorSpeed = 0.0f;
 
 	bumperJoint2 = (b2RevoluteJoint*)world->CreateJoint(&revoluteJointBumper2);
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	b2BodyDef anchorShooterSpringDef;
+	anchorShooterSpringDef.type = b2_staticBody;
+	anchorShooterSpringDef.position.Set(pinballBody.position.x * 2 - PIXEL_TO_METER(30), pinballBody.position.y + PIXEL_TO_METER(GetScreenHeight() / 1.2) - PIXEL_TO_METER(10.0f));
+	b2Body* anchorShooterSpring = world->CreateBody(&anchorShooterSpringDef);
+
+	b2CircleShape anchorShooterSpringShape;
+	anchorShooterSpringShape.m_radius = PIXEL_TO_METER(10.0f);
+
+	b2FixtureDef anchorShooterSpringFixture;
+	anchorShooterSpringFixture.shape = &anchorShooterSpringShape;
+	anchorShooterSpringFixture.density = 0.0f;
+	anchorShooterSpringFixture.restitution = 0.0f;
+	anchorShooterSpring->CreateFixture(&anchorShooterSpringFixture);
+
+
+	b2BodyDef shooterSpringDef;
+	shooterSpringDef.type = b2_dynamicBody;
+	shooterSpringDef.position.Set(anchorShooterSpring->GetPosition().x, pinballBody.position.y + PIXEL_TO_METER(GetScreenHeight() / 1.2) - PIXEL_TO_METER(100.0f));
+
+	b2Body* shooterSpring = world->CreateBody(&shooterSpringDef);
+
+	b2PolygonShape shooterSpringShape;
+	shooterSpringShape.SetAsBox(PIXEL_TO_METER(30.0f), PIXEL_TO_METER(7.5f));
+
+	b2FixtureDef shooterSpringFixture;
+	shooterSpringFixture.shape = &shooterSpringShape;
+	shooterSpringFixture.density = 1.0f;
+	shooterSpringFixture.friction = 0.0f;
+	shooterSpringFixture.restitution = 1.0f;
+	shooterSpring->CreateFixture(&shooterSpringFixture);
+
+
+	b2PrismaticJointDef shooterSpringJointDef;
+	b2Vec2 worldAxis(0.0f, 1.0f);
+	shooterSpringJointDef.Initialize(anchorShooterSpring, shooterSpring, anchorShooterSpring->GetWorldCenter(), worldAxis);
+	shooterSpringJointDef.lowerTranslation = PIXEL_TO_METER(-20.0f);
+	shooterSpringJointDef.upperTranslation = PIXEL_TO_METER(50.0f); 
+	shooterSpringJointDef.enableLimit = true;
+	shooterSpringJointDef.maxMotorForce = 500.0f;
+	shooterSpringJointDef.motorSpeed = 0.0f;
+	shooterSpringJointDef.enableMotor = true;
+
+	shooterSpringJoint = (b2PrismaticJoint*)world->CreateJoint(&shooterSpringJointDef);
 }
