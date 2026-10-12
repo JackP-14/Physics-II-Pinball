@@ -63,6 +63,24 @@ update_status ModulePhysics::PostUpdate()
 		b->CreateFixture(&fixture);
 	}
 
+	if (IsKeyDown(KEY_A))
+	{
+		bumperJoint1->SetMotorSpeed(-60.0f);
+	}
+	else
+	{
+		bumperJoint1->SetMotorSpeed(60.0f);
+	}
+
+	if (IsKeyDown(KEY_D))
+	{
+		bumperJoint2->SetMotorSpeed(60.0f);
+	}
+	else
+	{
+		bumperJoint2->SetMotorSpeed(-60.0f);
+	}
+
 	if (IsKeyPressed(KEY_F1))
 	{
 		debug = !debug;
@@ -237,7 +255,7 @@ void ModulePhysics::CreatePinball(b2World* world)
 	b2BodyDef bumperBody;
 	bumperBody.type = b2_dynamicBody;
 
-	bumperBody.position.Set(PIXEL_TO_METER(450), PIXEL_TO_METER(550));
+	bumperBody.position.Set(PIXEL_TO_METER(475), PIXEL_TO_METER(450));
 
 	b2Body* bumper = world->CreateBody(&bumperBody);
 
@@ -260,18 +278,19 @@ void ModulePhysics::CreatePinball(b2World* world)
 
 
 	b2BodyDef anchorDef1;
-	anchorDef1.type = b2_staticBody;
+	anchorDef1.type = b2_kinematicBody;
 
-	anchorDef1.position.Set(PIXEL_TO_METER(450), PIXEL_TO_METER(550));
+	anchorDef1.position.Set(bumperBody.position.x, bumperBody.position.y);
 
 	b2Body* anchor1 = world->CreateBody(&anchorDef1);
 
 	b2CircleShape anchorShape;
-	anchorShape.m_radius = PIXEL_TO_METER(8.0f);
+	anchorShape.m_radius = PIXEL_TO_METER(1.0f);
 
 	b2FixtureDef anchorFixture;
 	anchorFixture.shape = &anchorShape;
-	anchorFixture.density = 0.0f;                  
+	anchorFixture.density = 0.0f;   
+	anchorFixture.restitution = 0.0f;
 	anchor1->CreateFixture(&anchorFixture);
 
 	b2RevoluteJointDef revoluteJointBumper;
@@ -279,27 +298,30 @@ void ModulePhysics::CreatePinball(b2World* world)
 
 	revoluteJointBumper.enableLimit = true;
 	revoluteJointBumper.lowerAngle = -60 * b2_pi / 180;
-	revoluteJointBumper.upperAngle = 30 * b2_pi / 180;
+	revoluteJointBumper.upperAngle = 0 * b2_pi / 180;
 
-	world->CreateJoint(&revoluteJointBumper);
+	revoluteJointBumper.enableMotor = true;
+	revoluteJointBumper.maxMotorTorque = 1000.0f;
+	revoluteJointBumper.motorSpeed = 0.0f;
+
+	bumperJoint1 = (b2RevoluteJoint*)world->CreateJoint(&revoluteJointBumper);
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	b2BodyDef bumperBody2;
-	bumperBody2.type = b2_staticBody;
-
-	bumperBody2.position.Set(PIXEL_TO_METER(695), PIXEL_TO_METER(550));
+	bumperBody2.type = b2_dynamicBody;
+	bumperBody2.position.Set(PIXEL_TO_METER(825), PIXEL_TO_METER(450));   // pivot position
 
 	b2Body* bumper2 = world->CreateBody(&bumperBody2);
 
 	b2Vec2 verticesBumper2[4];
-	verticesBumper2[0].Set(PIXEL_TO_METER(25.0f), PIXEL_TO_METER(118.301f));
-	verticesBumper2[1].Set(PIXEL_TO_METER(0.0f), PIXEL_TO_METER(75.0f));
-	verticesBumper2[2].Set(PIXEL_TO_METER(129.904f), PIXEL_TO_METER(0.0f));
-	verticesBumper2[3].Set(PIXEL_TO_METER(154.904f), PIXEL_TO_METER(43.301f));
+	verticesBumper2[0].Set(PIXEL_TO_METER(0.0f),      PIXEL_TO_METER(0.0f));
+	verticesBumper2[1].Set(PIXEL_TO_METER(-129.904f), PIXEL_TO_METER(75.0f));
+	verticesBumper2[2].Set(PIXEL_TO_METER(-104.904f), PIXEL_TO_METER(118.301f));
+	verticesBumper2[3].Set(PIXEL_TO_METER(25.0f),     PIXEL_TO_METER(43.301f));
 
-	b2ChainShape bumperShape2;
-	bumperShape2.CreateLoop(verticesBumper2, 4);
+	b2PolygonShape bumperShape2;
+	bumperShape2.Set(verticesBumper2, 4);
 
 	b2FixtureDef bumperFixture2;
 	bumperFixture2.shape = &bumperShape2;
@@ -307,4 +329,29 @@ void ModulePhysics::CreatePinball(b2World* world)
 	bumperFixture2.friction = 0.0f;
 	bumperFixture2.restitution = 1.0f;
 	bumper2->CreateFixture(&bumperFixture2);
+
+	b2BodyDef anchorDef2;
+	anchorDef2.type = b2_kinematicBody;
+	anchorDef2.position.Set(bumperBody2.position.x, bumperBody2.position.y);
+	b2Body* anchor2 = world->CreateBody(&anchorDef2);
+
+	b2CircleShape anchorShape2;
+	anchorShape2.m_radius = PIXEL_TO_METER(1.0f);
+
+	b2FixtureDef anchorFixture2;
+	anchorFixture2.shape = &anchorShape2;
+	anchorFixture2.density = 0.0f;
+	anchorFixture2.restitution = 0.0f;
+	anchor2->CreateFixture(&anchorFixture2);
+
+	b2RevoluteJointDef revoluteJointBumper2;
+	revoluteJointBumper2.Initialize(anchor2, bumper2, anchor2->GetWorldCenter());
+	revoluteJointBumper2.enableLimit = true;
+	revoluteJointBumper2.lowerAngle = 0 * b2_pi / 180;     // mirrored: 0 to +60
+	revoluteJointBumper2.upperAngle = 60 * b2_pi / 180;
+	revoluteJointBumper2.enableMotor = true;
+	revoluteJointBumper2.maxMotorTorque = 1000.0f;
+	revoluteJointBumper2.motorSpeed = 0.0f;
+
+	bumperJoint2 = (b2RevoluteJoint*)world->CreateJoint(&revoluteJointBumper2);
 }
