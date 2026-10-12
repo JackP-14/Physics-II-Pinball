@@ -39,4 +39,7 @@ private:
 
 	b2Body* ground;
 	b2MouseJoint* mouse_joint;
+
+	b2RevoluteJoint* bumperJoint1;
+	b2RevoluteJoint* bumperJoint2;
 };
