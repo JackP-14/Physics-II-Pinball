@@ -54,7 +54,7 @@ update_status ModulePhysics::PostUpdate()
 {
 	if (IsKeyPressed(KEY_SPACE))
 	{
-		CreateCircle(GetMouseX(), GetMouseY(), 10);
+		CreateBall(GetMouseX(), GetMouseY(), 10);
 	}
 
 	if (IsKeyDown(KEY_A))
@@ -424,7 +424,7 @@ void ModulePhysics::CreatePinball(b2World* world)
 	shooterSpringJoint = (b2PrismaticJoint*)world->CreateJoint(&shooterSpringJointDef);
 }
 
-PhysBody* ModulePhysics::CreateCircle(int x, int y, int radius)
+PhysBody* ModulePhysics::CreateBall(int x, int y, int radius)
 {
 	PhysBody* pbody = new PhysBody();
 
@@ -451,13 +451,13 @@ PhysBody* ModulePhysics::CreateCircle(int x, int y, int radius)
 
 void ModulePhysics::BeginContact(b2Contact* contact)
 {
+	TraceLog(LOG_INFO, "No me toqueeeeeees");
+
 	PhysBody* a = (PhysBody*)contact->GetFixtureA()->GetBody()->GetUserData().pointer;
 	PhysBody* b = (PhysBody*)contact->GetFixtureB()->GetBody()->GetUserData().pointer;
 
 	if (a != NULL && a->listener != NULL)
 		a->listener->OnCollision(a, b);
-
-	LOG("ON CONTACT");
 
 	if (b != NULL && b->listener != NULL)
 		b->listener->OnCollision(b, a);

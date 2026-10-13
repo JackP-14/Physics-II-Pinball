@@ -50,7 +50,7 @@ public:
 
 	void CreatePinball(b2World* world);
 
-	PhysBody* CreateCircle(int x, int y, int radius);
+	PhysBody* CreateBall(int x, int y, int radius);
 
 	void BeginContact(b2Contact* contact) override;
 
