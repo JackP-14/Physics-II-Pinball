@@ -33,6 +33,8 @@ bool ModulePhysics::Start()
 
 	world->SetContinuousPhysics(true); // Enables TOI in the world
 
+	world->SetContactListener(this); // Enables contact functions inside the world
+
 	b2BodyDef bd;
 	ground = world->CreateBody(&bd);
 
@@ -396,7 +398,7 @@ void ModulePhysics::CreatePinball(b2World* world)
 	b2Body* anchorShooterSpring = world->CreateBody(&anchorShooterSpringDef);
 
 	b2CircleShape anchorShooterSpringShape;
-	anchorShooterSpringShape.m_radius = PIXEL_TO_METER(10.0f);
+	anchorShooterSpringShape.m_radius = PIXEL_TO_METER(1.0f);
 
 	b2FixtureDef anchorShooterSpringFixture;
 	anchorShooterSpringFixture.shape = &anchorShooterSpringShape;
@@ -433,4 +435,18 @@ void ModulePhysics::CreatePinball(b2World* world)
 	shooterSpringJointDef.enableMotor = true;
 
 	shooterSpringJoint = (b2PrismaticJoint*)world->CreateJoint(&shooterSpringJointDef);
+}
+
+void ModulePhysics::BeginContact(b2Contact* contact)
+{
+	PhysBody* a = (PhysBody*)contact->GetFixtureA()->GetBody()->GetUserData().pointer;
+	PhysBody* b = (PhysBody*)contact->GetFixtureB()->GetBody()->GetUserData().pointer;
+
+	if (a != NULL && a->listener != NULL)
+		a->listener->OnCollision(a, b);
+
+	LOG("ON CONTACT");
+
+	if (b != NULL && b->listener != NULL)
+		b->listener->OnCollision(b, a);
 }
