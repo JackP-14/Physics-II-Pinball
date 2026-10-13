@@ -54,20 +54,7 @@ update_status ModulePhysics::PostUpdate()
 {
 	if (IsKeyPressed(KEY_SPACE))
 	{
-		b2BodyDef body;
-		body.type = b2_dynamicBody;
-		body.bullet = true; // Ensures the ball have TOI
-		body.position.Set(PIXEL_TO_METER(GetMouseX()), PIXEL_TO_METER(GetMouseY()));
-
-		b2Body* b = world->CreateBody(&body);
-
-		b2CircleShape shape;
-		shape.m_radius = PIXEL_TO_METER(10);
-
-		b2FixtureDef fixture;
-		fixture.shape = &shape;
-		fixture.density = 1.0f;
-		b->CreateFixture(&fixture);
+		CreateCircle(GetMouseX(), GetMouseY(), 10);
 	}
 
 	if (IsKeyDown(KEY_A))
@@ -435,6 +422,31 @@ void ModulePhysics::CreatePinball(b2World* world)
 	shooterSpringJointDef.enableMotor = true;
 
 	shooterSpringJoint = (b2PrismaticJoint*)world->CreateJoint(&shooterSpringJointDef);
+}
+
+PhysBody* ModulePhysics::CreateCircle(int x, int y, int radius)
+{
+	PhysBody* pbody = new PhysBody();
+
+	b2BodyDef body;
+	body.type = b2_dynamicBody;
+	body.bullet = true;
+	body.position.Set(PIXEL_TO_METER(x), PIXEL_TO_METER(y));
+	body.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
+
+	b2Body* b = world->CreateBody(&body);
+
+	b2CircleShape shape;
+	shape.m_radius = PIXEL_TO_METER(radius);
+
+	b2FixtureDef fixture;
+	fixture.shape = &shape;
+	fixture.density = 1.0f;
+	b->CreateFixture(&fixture);
+
+	pbody->body = b;
+
+	return pbody;
 }
 
 void ModulePhysics::BeginContact(b2Contact* contact)
