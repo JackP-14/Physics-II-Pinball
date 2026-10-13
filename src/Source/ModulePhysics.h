@@ -35,13 +35,13 @@ public:
 private:
 
 	bool debug;
-	b2World* world = NULL;
+	b2World* world;
 
-	b2Body* ground = NULL;
-	b2MouseJoint* mouse_joint = NULL;
+	b2Body* ground;
+	b2MouseJoint* mouse_joint;
 
-	b2RevoluteJoint* bumperJoint1 = NULL;
-	b2RevoluteJoint* bumperJoint2 = NULL;
+	b2RevoluteJoint* bumperJoint1;
+	b2RevoluteJoint* bumperJoint2;
 
-	b2PrismaticJoint* shooterSpringJoint = NULL;
+	b2PrismaticJoint* shooterSpringJoint;
 };
