@@ -3,8 +3,8 @@
 #include "Module.h"
 #include "Globals.h"
 
-// TODO 1: Include Box 2 header
 #include "box2d/box2d.h"
+
 
 // Gravity in m/s^2. Screen Y grows DOWNWARDS and we convert meters <-> pixels without flipping Y,
 // so a POSITIVE Y gravity makes bodies fall down on screen. That is why the world receives -GRAVITY_Y.
@@ -18,8 +18,26 @@
 #define METER_TO_PIXEL(m) ((int) floor(PIXEL_PER_METER * (m)))
 #define PIXEL_TO_METER(p)  ((float) METER_PER_PIXEL * (p))
 
+
+class PhysBody
+{
+public:
+	PhysBody() : body(NULL), listener(NULL)
+	{}
+
+	/*void GetPosition(int& x, int& y) const;
+	float GetRotation() const;
+	bool Contains(int x, int y) const;
+	int RayCast(int x1, int y1, int x2, int y2, float& normal_x, float& normal_y) const;*/
+
+public:
+	b2Body* body;
+
+	Module* listener;
+};
+
 // Module --------------------------------------
-class ModulePhysics : public Module
+class ModulePhysics : public Module, public b2ContactListener
 {
 public:
 	ModulePhysics(Application* app, bool start_enabled = true);
@@ -31,6 +49,10 @@ public:
 	bool CleanUp();
 
 	void CreatePinball(b2World* world);
+
+	PhysBody* CreateBall(int x, int y, int radius);
+
+	void BeginContact(b2Contact* contact) override;
 
 private:
 
