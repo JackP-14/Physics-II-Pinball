@@ -14,6 +14,9 @@ ModulePhysics::ModulePhysics(Application* app, bool start_enabled) : Module(app,
 	world = NULL;
 	ground = NULL;
 	mouse_joint = NULL;
+	bumperJoint1 = NULL;
+	bumperJoint2 = NULL;
+	shooterSpringJoint = NULL;
 	debug = true;
 }
 
@@ -27,6 +30,8 @@ bool ModulePhysics::Start()
 	LOG("Creating Physics 2D environment");
 
 	world = new b2World(b2Vec2(GRAVITY_X, -GRAVITY_Y));
+
+	world->SetContinuousPhysics(true); // Enables TOI in the world
 
 	b2BodyDef bd;
 	ground = world->CreateBody(&bd);
@@ -43,13 +48,13 @@ update_status ModulePhysics::PreUpdate()
 	return UPDATE_CONTINUE;
 }
 
-// 
 update_status ModulePhysics::PostUpdate()
 {
 	if (IsKeyPressed(KEY_SPACE))
 	{
 		b2BodyDef body;
 		body.type = b2_dynamicBody;
+		body.bullet = true; // Ensures the ball have TOI
 		body.position.Set(PIXEL_TO_METER(GetMouseX()), PIXEL_TO_METER(GetMouseY()));
 
 		b2Body* b = world->CreateBody(&body);
@@ -192,8 +197,8 @@ update_status ModulePhysics::PostUpdate()
 		def.bodyA = ground;
 		def.bodyB = body_clicked;
 		def.target = mouse_position;
-		def.maxForce = 100.0f * body_clicked->GetMass();
-		b2LinearStiffness(def.stiffness, def.damping, 5.0f, 0.7f, def.bodyA, def.bodyB); // 5 Hz, damping ratio 0.7
+		def.maxForce = 100000000000.0f * body_clicked->GetMass(); // Max force of the mouse-dragged object
+		b2LinearStiffness(def.stiffness, def.damping, 20.0f, 1.0f, def.bodyA, def.bodyB);
 
 		mouse_joint = (b2MouseJoint*)world->CreateJoint(&def);
 		body_clicked->SetAwake(true);
@@ -208,7 +213,6 @@ update_status ModulePhysics::PostUpdate()
 		DrawLine(METER_TO_PIXEL(anchor_a.x), METER_TO_PIXEL(anchor_a.y), METER_TO_PIXEL(anchor_b.x), METER_TO_PIXEL(anchor_b.y), RED);
 	}
 
-	// TODO 4: If the player releases the mouse button, destroy the joint
 	if (mouse_joint != NULL && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
 	{
 		world->DestroyJoint(mouse_joint);
