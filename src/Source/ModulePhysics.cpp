@@ -54,7 +54,7 @@ update_status ModulePhysics::PostUpdate()
 {
 	if (IsKeyPressed(KEY_SPACE))
 	{
-		CreateBall(GetMouseX(), GetMouseY(), 10);
+		CreateCircle(GetMouseX(), GetMouseY(), 10);
 	}
 
 	if (IsKeyDown(KEY_A))
@@ -424,7 +424,7 @@ void ModulePhysics::CreatePinball(b2World* world)
 	shooterSpringJoint = (b2PrismaticJoint*)world->CreateJoint(&shooterSpringJointDef);
 }
 
-PhysBody* ModulePhysics::CreateBall(int x, int y, int radius)
+PhysBody* ModulePhysics::CreateCircle(int x, int y, int radius)
 {
 	PhysBody* pbody = new PhysBody();
 
@@ -447,6 +447,15 @@ PhysBody* ModulePhysics::CreateBall(int x, int y, int radius)
 	pbody->body = b;
 
 	return pbody;
+}
+
+void ModulePhysics::DestroyBody(PhysBody* pbody)
+{
+	if (pbody == NULL)
+		return;
+
+	world->DestroyBody(pbody->body); // Box2D frees the body and its fixtures
+	delete pbody;                    // we free our own wrapper
 }
 
 void ModulePhysics::BeginContact(b2Contact* contact)
