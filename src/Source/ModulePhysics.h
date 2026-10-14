@@ -5,6 +5,8 @@
 
 #include "box2d/box2d.h"
 
+#include <vector>
+
 
 // Gravity in m/s^2. Screen Y grows DOWNWARDS and we convert meters <-> pixels without flipping Y,
 // so a POSITIVE Y gravity makes bodies fall down on screen. That is why the world receives -GRAVITY_Y.
@@ -23,7 +25,8 @@ class PhysBody
 {
 public:
 	PhysBody() : body(NULL), listener(NULL)
-	{}
+	{
+	}
 
 	void GetPosition(int& x, int& y) const;
 	float GetRotation() const;
@@ -60,6 +63,12 @@ public:
 
 private:
 
+	struct TeleportRequest
+	{
+		PhysBody* body;
+		b2Vec2 target; // meters
+	};
+
 	bool debug;
 	b2World* world;
 
@@ -70,5 +79,10 @@ private:
 	b2RevoluteJoint* bumperJoint2;
 
 	b2PrismaticJoint* shooterSpringJoint;
-	
+
+	// Portal
+	std::vector<TeleportRequest> teleports;
+	PhysBody* portalIn;
+	b2Vec2 portalOut; // meters
+
 };

@@ -6,6 +6,7 @@
 #include "p2Point.h"
 
 #include <math.h>
+#include <algorithm>
 
 
 
@@ -17,6 +18,8 @@ ModulePhysics::ModulePhysics(Application* app, bool start_enabled) : Module(app,
 	bumperJoint1 = NULL;
 	bumperJoint2 = NULL;
 	shooterSpringJoint = NULL;
+	portalIn = NULL;
+	portalOut = b2Vec2(0.0f, 0.0f);
 	debug = true;
 }
 
@@ -45,6 +48,15 @@ bool ModulePhysics::Start()
 
 update_status ModulePhysics::PreUpdate()
 {
+	// Execute pending teleports: the world is NOT locked here (we are outside Step)
+	for (const TeleportRequest& t : teleports)
+	{
+		b2Body* b = t.body->body;
+		b->SetTransform(t.target, b->GetAngle());
+		b->SetAwake(true);
+	}
+	teleports.clear();
+
 	world->Step(1.0f / 60.0f, 8, 3);
 
 	return UPDATE_CONTINUE;
@@ -105,71 +117,71 @@ update_status ModulePhysics::PostUpdate()
 	// Bonus code: this will iterate all objects in the world and draw the circles
 	for (b2Body* b = world->GetBodyList(); b; b = b->GetNext())
 	{
-		for(b2Fixture* f = b->GetFixtureList(); f; f = f->GetNext())
+		for (b2Fixture* f = b->GetFixtureList(); f; f = f->GetNext())
 		{
-			switch(f->GetType())
+			switch (f->GetType())
 			{
 				// Draw circles ------------------------------------------------
-				case b2Shape::e_circle:
+			case b2Shape::e_circle:
+			{
+				b2CircleShape* shape = (b2CircleShape*)f->GetShape();
+				b2Vec2 pos = f->GetBody()->GetPosition();
+
+				DrawCircle(METER_TO_PIXEL(pos.x), METER_TO_PIXEL(pos.y), (float)METER_TO_PIXEL(shape->m_radius), Color{ 0, 0, 0, 128 });
+			}
+			break;
+
+			// Draw polygons ------------------------------------------------
+			case b2Shape::e_polygon:
+			{
+				b2PolygonShape* polygonShape = (b2PolygonShape*)f->GetShape();
+				int32 count = polygonShape->m_count;
+				b2Vec2 prev, v;
+
+				for (int32 i = 0; i < count; ++i)
 				{
-					b2CircleShape* shape = (b2CircleShape*)f->GetShape();
-					b2Vec2 pos = f->GetBody()->GetPosition();
-					
-					DrawCircle(METER_TO_PIXEL(pos.x), METER_TO_PIXEL(pos.y), (float)METER_TO_PIXEL(shape->m_radius), Color{0, 0, 0, 128});
-				}
-				break;
+					v = b->GetWorldPoint(polygonShape->m_vertices[i]);
+					if (i > 0)
+						DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), RED);
 
-				// Draw polygons ------------------------------------------------
-				case b2Shape::e_polygon:
+					prev = v;
+				}
+
+				v = b->GetWorldPoint(polygonShape->m_vertices[0]);
+				DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), RED);
+			}
+			break;
+
+			// Draw chains contour -------------------------------------------
+			case b2Shape::e_chain:
+			{
+				b2ChainShape* shape = (b2ChainShape*)f->GetShape();
+				b2Vec2 prev, v;
+
+				for (int32 i = 0; i < shape->m_count; ++i)
 				{
-					b2PolygonShape* polygonShape = (b2PolygonShape*)f->GetShape();
-					int32 count = polygonShape->m_count;
-					b2Vec2 prev, v;
-
-					for(int32 i = 0; i < count; ++i)
-					{
-						v = b->GetWorldPoint(polygonShape->m_vertices[i]);
-						if(i > 0)
-							DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), RED);
-
-						prev = v;
-					}
-
-					v = b->GetWorldPoint(polygonShape->m_vertices[0]);
-					DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), RED);
+					v = b->GetWorldPoint(shape->m_vertices[i]);
+					if (i > 0)
+						DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), GREEN);
+					prev = v;
 				}
-				break;
 
-				// Draw chains contour -------------------------------------------
-				case b2Shape::e_chain:
-				{
-					b2ChainShape* shape = (b2ChainShape*)f->GetShape();
-					b2Vec2 prev, v;
+				v = b->GetWorldPoint(shape->m_vertices[0]);
+				DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), GREEN);
+			}
+			break;
 
-					for(int32 i = 0; i < shape->m_count; ++i)
-					{
-						v = b->GetWorldPoint(shape->m_vertices[i]);
-						if(i > 0)
-							DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), GREEN);
-						prev = v;
-					}
+			// Draw a single segment(edge) ----------------------------------
+			case b2Shape::e_edge:
+			{
+				b2EdgeShape* shape = (b2EdgeShape*)f->GetShape();
+				b2Vec2 v1, v2;
 
-					v = b->GetWorldPoint(shape->m_vertices[0]);
-					DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), GREEN);
-				}
-				break;
-
-				// Draw a single segment(edge) ----------------------------------
-				case b2Shape::e_edge:
-				{
-					b2EdgeShape* shape = (b2EdgeShape*)f->GetShape();
-					b2Vec2 v1, v2;
-
-					v1 = b->GetWorldPoint(shape->m_vertex1);
-					v2 = b->GetWorldPoint(shape->m_vertex2);
-					DrawLine(METER_TO_PIXEL(v1.x), METER_TO_PIXEL(v1.y), METER_TO_PIXEL(v2.x), METER_TO_PIXEL(v2.y), BLUE);
-				}
-				break;
+				v1 = b->GetWorldPoint(shape->m_vertex1);
+				v2 = b->GetWorldPoint(shape->m_vertex2);
+				DrawLine(METER_TO_PIXEL(v1.x), METER_TO_PIXEL(v1.y), METER_TO_PIXEL(v2.x), METER_TO_PIXEL(v2.y), BLUE);
+			}
+			break;
 			}
 
 			if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && mouse_joint == NULL && body_clicked == NULL
@@ -218,9 +230,15 @@ bool ModulePhysics::CleanUp()
 {
 	LOG("Destroying physics world");
 
+	teleports.clear();
+
 	// Delete the whole physics world! (this also frees every body, fixture and joint it owns)
 	delete world;
 	world = NULL;
+
+	// The portal sensor wrapper is ours
+	delete portalIn;
+	portalIn = NULL;
 
 	return true;
 }
@@ -262,7 +280,7 @@ void ModulePhysics::CreatePinball(b2World* world)
 	b2Body* eB = world->CreateBody(&esquinaBody);
 
 	b2Vec2 verticesEsquina[3];
-	verticesEsquina[0].Set(PIXEL_TO_METER(0.0f),   PIXEL_TO_METER(0.0f));
+	verticesEsquina[0].Set(PIXEL_TO_METER(0.0f), PIXEL_TO_METER(0.0f));
 	verticesEsquina[1].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(0.0f));
 	verticesEsquina[2].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(125.0f));
 
@@ -286,9 +304,9 @@ void ModulePhysics::CreatePinball(b2World* world)
 	b2Body* bumper = world->CreateBody(&bumperBody);
 
 	b2Vec2 verticesBumper[3];
-	verticesBumper[0].Set(PIXEL_TO_METER(-6.25f),  PIXEL_TO_METER(10.825f));
-	verticesBumper[1].Set(PIXEL_TO_METER(6.25f),   PIXEL_TO_METER(-10.825f));
-	verticesBumper[2].Set(PIXEL_TO_METER(64.952f), PIXEL_TO_METER(37.5f));    
+	verticesBumper[0].Set(PIXEL_TO_METER(-6.25f), PIXEL_TO_METER(10.825f));
+	verticesBumper[1].Set(PIXEL_TO_METER(6.25f), PIXEL_TO_METER(-10.825f));
+	verticesBumper[2].Set(PIXEL_TO_METER(64.952f), PIXEL_TO_METER(37.5f));
 
 	b2PolygonShape bumperShape;
 	bumperShape.Set(verticesBumper, 3);
@@ -312,7 +330,7 @@ void ModulePhysics::CreatePinball(b2World* world)
 
 	b2FixtureDef anchorFixture;
 	anchorFixture.shape = &anchorShape;
-	anchorFixture.density = 0.0f;   
+	anchorFixture.density = 0.0f;
 	anchorFixture.restitution = 0.0f;
 	anchor1->CreateFixture(&anchorFixture);
 
@@ -333,14 +351,14 @@ void ModulePhysics::CreatePinball(b2World* world)
 
 	b2BodyDef bumperBody2;
 	bumperBody2.type = b2_dynamicBody;
-	bumperBody2.position.Set(PIXEL_TO_METER(750), PIXEL_TO_METER(550));  
+	bumperBody2.position.Set(PIXEL_TO_METER(750), PIXEL_TO_METER(550));
 
 	b2Body* bumper2 = world->CreateBody(&bumperBody2);
 
 	b2Vec2 verticesBumper2[3];
-	verticesBumper2[0].Set(PIXEL_TO_METER(6.25f),    PIXEL_TO_METER(10.825f));
-	verticesBumper2[1].Set(PIXEL_TO_METER(-6.25f),   PIXEL_TO_METER(-10.825f));
-	verticesBumper2[2].Set(PIXEL_TO_METER(-64.952f), PIXEL_TO_METER(37.5f)); 
+	verticesBumper2[0].Set(PIXEL_TO_METER(6.25f), PIXEL_TO_METER(10.825f));
+	verticesBumper2[1].Set(PIXEL_TO_METER(-6.25f), PIXEL_TO_METER(-10.825f));
+	verticesBumper2[2].Set(PIXEL_TO_METER(-64.952f), PIXEL_TO_METER(37.5f));
 
 	b2PolygonShape bumperShape2;
 	bumperShape2.Set(verticesBumper2, 3);
@@ -415,13 +433,22 @@ void ModulePhysics::CreatePinball(b2World* world)
 	b2Vec2 worldAxis(0.0f, 1.0f);
 	shooterSpringJointDef.Initialize(anchorShooterSpring, shooterSpring, anchorShooterSpring->GetWorldCenter(), worldAxis);
 	shooterSpringJointDef.lowerTranslation = PIXEL_TO_METER(-20.0f);
-	shooterSpringJointDef.upperTranslation = PIXEL_TO_METER(50.0f); 
+	shooterSpringJointDef.upperTranslation = PIXEL_TO_METER(50.0f);
 	shooterSpringJointDef.enableLimit = true;
 	shooterSpringJointDef.maxMotorForce = 500.0f;
 	shooterSpringJointDef.motorSpeed = 0.0f;
 	shooterSpringJointDef.enableMotor = true;
 
 	shooterSpringJoint = (b2PrismaticJoint*)world->CreateJoint(&shooterSpringJointDef);
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	// Portal: entry (sensor) and exit point. Adjust positions to your table.
+	int left = GetScreenWidth() / 3;
+	int top = GetScreenHeight() / 10;
+
+	portalIn = CreateRectangleSensor(left + 80, top + 150, 25, 25);
+	portalOut = b2Vec2(PIXEL_TO_METER(left + 300), PIXEL_TO_METER(top + 150));
 }
 
 PhysBody* ModulePhysics::CreateCircle(int x, int y, int radius)
@@ -454,16 +481,37 @@ void ModulePhysics::DestroyBody(PhysBody* pbody)
 	if (pbody == NULL)
 		return;
 
+	// Drop any pending teleport of this body (avoids a dangling pointer)
+	teleports.erase(
+		std::remove_if(teleports.begin(), teleports.end(),
+			[pbody](const TeleportRequest& t) { return t.body == pbody; }),
+		teleports.end());
+
 	world->DestroyBody(pbody->body); // Box2D frees the body and its fixtures
 	delete pbody;                    // we free our own wrapper
 }
 
 void ModulePhysics::BeginContact(b2Contact* contact)
 {
-	TraceLog(LOG_INFO, "No me toqueeeeeees");
-
 	PhysBody* a = (PhysBody*)contact->GetFixtureA()->GetBody()->GetUserData().pointer;
 	PhysBody* b = (PhysBody*)contact->GetFixtureB()->GetBody()->GetUserData().pointer;
+
+	// Portal: only queue the teleport, the world is locked during Step
+	PhysBody* ball = NULL;
+	if (a != NULL && a == portalIn) ball = b;
+	else if (b != NULL && b == portalIn) ball = a;
+
+	if (ball != NULL)
+	{
+		bool queued = false;
+		for (const TeleportRequest& t : teleports)
+		{
+			if (t.body == ball) { queued = true; break; }
+		}
+
+		if (!queued)
+			teleports.push_back({ ball, portalOut });
+	}
 
 	if (a != NULL && a->listener != NULL)
 		a->listener->OnCollision(a, b);
