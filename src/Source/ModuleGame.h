@@ -34,7 +34,7 @@ public:
 	Texture2D circle;
 	Texture2D box;
 	Texture2D rick;
-
+	Texture2D walls;
 	uint32 bonus_fx;
 
 	vec2<int> ray;

@@ -234,23 +234,23 @@ void ModulePhysics::CreatePinball(b2World* world)
 	//pinballBody.position.Set(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
 	pinballBody.position.Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 10));
 
-	b2Body* p = world->CreateBody(&pinballBody);
+	//b2Body* p = world->CreateBody(&pinballBody);
 
-	b2Vec2 vertices[4];
-	vertices[0].Set(0.0f, 0.0f);
-	vertices[1].Set(0.0f, PIXEL_TO_METER(GetScreenHeight() / 1.2));
-	vertices[2].Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 1.2));
-	vertices[3].Set(PIXEL_TO_METER(GetScreenWidth() / 3), 0.0f);
+	//b2Vec2 vertices[4];
+	//vertices[0].Set(0.0f, 0.0f);
+	//vertices[1].Set(0.0f, PIXEL_TO_METER(GetScreenHeight() / 1.2));
+	//vertices[2].Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 1.2));
+	//vertices[3].Set(PIXEL_TO_METER(GetScreenWidth() / 3), 0.0f);
 
-	b2ChainShape pinballShape;
-	pinballShape.CreateLoop(vertices, 4);
+	//b2ChainShape pinballShape;
+	//pinballShape.CreateLoop(vertices, 4);
 
-	b2FixtureDef pinballFixture;
-	pinballFixture.shape = &pinballShape;
-	pinballFixture.density = 1.0f;
-	pinballFixture.friction = 0.0f;
-	pinballFixture.restitution = 0.2f;
-	p->CreateFixture(&pinballFixture);
+	//b2FixtureDef pinballFixture;
+	//pinballFixture.shape = &pinballShape;
+	//pinballFixture.density = 1.0f;
+	//pinballFixture.friction = 0.0f;
+	//pinballFixture.restitution = 0.2f;
+	//p->CreateFixture(&pinballFixture);
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -447,6 +447,41 @@ PhysBody* ModulePhysics::CreateCircle(int x, int y, int radius)
 	pbody->body = b;
 
 	return pbody;
+}
+
+PhysBody* ModulePhysics::CreateWalls() 
+{
+	PhysBody* pbody = new PhysBody(); 
+	// Spawn main Pinball body
+
+	b2BodyDef pinballBody;
+	pinballBody.type = b2_staticBody;
+
+	//pinballBody.position.Set(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+	pinballBody.position.Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 10));
+
+	b2Body* p = world->CreateBody(&pinballBody);
+
+	b2Vec2 vertices[4];
+	vertices[0].Set(0.0f, 0.0f);
+	vertices[1].Set(0.0f, PIXEL_TO_METER(GetScreenHeight() / 1.2));
+	vertices[2].Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 1.2));
+	vertices[3].Set(PIXEL_TO_METER(GetScreenWidth() / 3), 0.0f);
+
+	b2ChainShape pinballShape;
+	pinballShape.CreateLoop(vertices, 4);
+
+	b2FixtureDef pinballFixture;
+	pinballFixture.shape = &pinballShape;
+	pinballFixture.density = 1.0f;
+	pinballFixture.friction = 0.0f;
+	pinballFixture.restitution = 0.2f;
+	p->CreateFixture(&pinballFixture);
+
+	pbody->body = p;
+
+	return pbody;
+
 }
 
 void ModulePhysics::DestroyBody(PhysBody* pbody)

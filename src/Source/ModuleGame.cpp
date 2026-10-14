@@ -57,6 +57,37 @@ private:
 	Texture2D texture;
 };
 
+class Walls : public PhysicEntity
+{
+public:
+	Walls(ModulePhysics* physics, Texture2D _texture)
+		: PhysicEntity(physics->CreateWalls())
+		, texture(_texture)
+	{
+
+	}
+
+	void Update() override
+	{
+		int x, y;
+		//body->GetPosition(x, y);
+		x = 750.0f;
+		y = 500.0f;
+
+		// Red when the mouse is inside the body
+		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
+
+		// Box2D positions are the center of the body: draw the texture around its center
+		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
+		Rectangle dest = { (float)x, (float)y, (float)texture.width/1.5f, (float)texture.height/1.5f };
+		Vector2 origin = { (float)texture.width / 2.0f, (float)texture.height / 2.0f };
+		DrawTexturePro(texture, source, dest, origin, body->GetRotation() * RAD2DEG, tint);
+	}
+
+private:
+	Texture2D texture;
+};
+
 class Box : public PhysicEntity
 {
 public:
@@ -190,8 +221,16 @@ bool ModuleGame::Start()
 	circle = LoadTexture("Assets/wheel.png");
 	box = LoadTexture("Assets/crate.png");
 	rick = LoadTexture("Assets/rick_head.png");
+	walls = LoadTexture("Assets/background.png");
 
 	bonus_fx = App->audio->LoadFx("Assets/bonus.wav");
+
+	//Create the walls Entity Instance and push it back to the entity list
+	Walls* w = new Walls(App->physics, walls);
+
+	//w->body->listener = this;
+	entities.push_back(w);
+		
 
 	// Sensor at the bottom of the screen
 	sensor = App->physics->CreateRectangleSensor(SCREEN_WIDTH / 2, SCREEN_HEIGHT, SCREEN_WIDTH / 2, 25);
