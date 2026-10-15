@@ -103,6 +103,7 @@ update_status ModulePhysics::PostUpdate()
 	b2Body* body_clicked = NULL;
 
 	// Bonus code: this will iterate all objects in the world and draw the circles
+	
 	for (b2Body* b = world->GetBodyList(); b; b = b->GetNext())
 	{
 		for(b2Fixture* f = b->GetFixtureList(); f; f = f->GetNext())
@@ -233,7 +234,7 @@ void ModulePhysics::CreatePinball(b2World* world)
 
 	//pinballBody.position.Set(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
 	pinballBody.position.Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 10));
-
+	
 	//b2Body* p = world->CreateBody(&pinballBody);
 
 	//b2Vec2 vertices[4];
@@ -254,7 +255,7 @@ void ModulePhysics::CreatePinball(b2World* world)
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	b2BodyDef esquinaBody;
+	/*b2BodyDef esquinaBody;
 	esquinaBody.type = b2_staticBody;
 
 	esquinaBody.position.Set(pinballBody.position.x * 2 - PIXEL_TO_METER(125), pinballBody.position.y);
@@ -274,7 +275,7 @@ void ModulePhysics::CreatePinball(b2World* world)
 	esquinaFixture.density = 1.0f;
 	esquinaFixture.friction = 0.0f;
 	esquinaFixture.restitution = 0.2f;
-	eB->CreateFixture(&esquinaFixture);
+	eB->CreateFixture(&esquinaFixture);*/
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -482,6 +483,41 @@ PhysBody* ModulePhysics::CreateWalls()
 
 	return pbody;
 
+}
+
+PhysBody* ModulePhysics::CreateEsquina() {
+	PhysBody* pbody = new PhysBody();
+	b2BodyDef pinballBody;
+	pinballBody.type = b2_staticBody;
+
+	//pinballBody.position.Set(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+	pinballBody.position.Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 10));
+
+	b2BodyDef esquinaBody;
+	esquinaBody.type = b2_staticBody;
+
+	esquinaBody.position.Set(pinballBody.position.x * 2 - PIXEL_TO_METER(125), pinballBody.position.y);
+
+	b2Body* eB = world->CreateBody(&esquinaBody);
+
+	b2Vec2 verticesEsquina[3];
+	verticesEsquina[0].Set(PIXEL_TO_METER(0.0f), PIXEL_TO_METER(0.0f));
+	verticesEsquina[1].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(0.0f));
+	verticesEsquina[2].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(125.0f));
+
+	b2PolygonShape esquinaShape;
+	esquinaShape.Set(verticesEsquina, 3);
+
+	b2FixtureDef esquinaFixture;
+	esquinaFixture.shape = &esquinaShape;
+	esquinaFixture.density = 1.0f;
+	esquinaFixture.friction = 0.0f;
+	esquinaFixture.restitution = 0.2f;
+	eB->CreateFixture(&esquinaFixture);
+
+	pbody->body = eB;
+
+	return pbody;
 }
 
 void ModulePhysics::DestroyBody(PhysBody* pbody)

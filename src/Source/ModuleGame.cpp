@@ -76,10 +76,42 @@ public:
 
 		// Red when the mouse is inside the body
 		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
+		tint.a = 50;
 
 		// Box2D positions are the center of the body: draw the texture around its center
 		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
 		Rectangle dest = { (float)x, (float)y, (float)texture.width/1.5f, (float)texture.height/1.5f };
+		Vector2 origin = { (float)texture.width / 2.0f, (float)texture.height / 2.0f };
+		DrawTexturePro(texture, source, dest, origin, body->GetRotation() * RAD2DEG, tint);
+	}
+
+private:
+	Texture2D texture;
+};
+
+class Esquina : public PhysicEntity
+{
+public:
+	Esquina(ModulePhysics* physics, Texture2D _texture)
+		: PhysicEntity(physics->CreateEsquina())
+		, texture(_texture)
+	{
+
+	}
+
+	void Update() override
+	{
+		int x, y;
+		body->GetPosition(x, y);
+		x += 50;
+		y += 50;
+
+		// Red when the mouse is inside the body
+		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
+		tint.a = 50;
+		// Box2D positions are the center of the body: draw the texture around its center
+		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
+		Rectangle dest = { (float)x, (float)y, (float)texture.width , (float)texture.height };
 		Vector2 origin = { (float)texture.width / 2.0f, (float)texture.height / 2.0f };
 		DrawTexturePro(texture, source, dest, origin, body->GetRotation() * RAD2DEG, tint);
 	}
@@ -222,14 +254,16 @@ bool ModuleGame::Start()
 	box = LoadTexture("Assets/crate.png");
 	rick = LoadTexture("Assets/rick_head.png");
 	walls = LoadTexture("Assets/background.png");
+	esquina = LoadTexture("Assets/esquina.png");
 
 	bonus_fx = App->audio->LoadFx("Assets/bonus.wav");
 
 	//Create the walls Entity Instance and push it back to the entity list
 	Walls* w = new Walls(App->physics, walls);
-
+	Esquina* e = new Esquina(App->physics, esquina);
 	//w->body->listener = this;
 	entities.push_back(w);
+	entities.push_back(e);
 		
 
 	// Sensor at the bottom of the screen
@@ -272,6 +306,18 @@ update_status ModuleGame::Update()
 		}
 	}
 	bodies_to_destroy.clear();
+
+
+	//
+	// 
+	// 
+	// 
+	// 
+	// 
+	// User Input
+
+
+
 
 	if (IsKeyPressed(KEY_SPACE))
 	{

@@ -55,6 +55,7 @@ public:
 	PhysBody* CreateCircle(int x, int y, int radius);
 
 	PhysBody* CreateWalls();
+	PhysBody* CreateEsquina();
 	void DestroyBody(PhysBody* pbody);
 
 	void BeginContact(b2Contact* contact) override;
