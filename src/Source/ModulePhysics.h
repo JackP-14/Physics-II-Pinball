@@ -24,7 +24,8 @@ class PhysBody
 {
 public:
 	PhysBody() : body(NULL), listener(NULL)
-	{}
+	{
+	}
 
 	void GetPosition(int& x, int& y) const;
 	float GetRotation() const;
@@ -53,6 +54,16 @@ public:
 
 	void CreatePinball(b2World* world);
 
+	PhysBody* CreatePinballOuterWall(b2World* world);
+
+	PhysBody* CreatePinballLeftBumper(b2World* world);
+
+	PhysBody* CreatePinballRightBumper(b2World* world);
+
+	PhysBody* CreatePinballShooter(b2World* world);
+
+	PhysBody* CreatePinballEsquina(b2World* world);
+
 	PhysBody* CreateCircle(int x, int y, int radius);
 
 	PhysBody* CreateWalls();
@@ -63,6 +74,8 @@ public:
 	void DestroyBody(PhysBody* pbody);
 
 	void BeginContact(b2Contact* contact) override;
+
+	void InstantiatePinball(b2World& world);
 
 private:
 	struct TeleportRequest {
