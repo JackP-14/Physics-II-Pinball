@@ -671,37 +671,37 @@ PhysBody* ModulePhysics::CreatePinballShooter(b2World* world)
 	return pbody;
 }
 
-PhysBody* ModulePhysics::CreatePinballEsquina(b2World* world)
-{
-	PhysBody* pbody = new PhysBody();
-
-	b2BodyDef esquinaBody;
-	esquinaBody.type = b2_staticBody;
-	esquinaBody.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
-
-	esquinaBody.position.Set(PIXEL_TO_METER(GetScreenWidth() / 3) * 2 - PIXEL_TO_METER(125), PIXEL_TO_METER(GetScreenHeight() / 10));
-
-	b2Body* eB = world->CreateBody(&esquinaBody);
-
-	b2Vec2 verticesEsquina[3];
-	verticesEsquina[0].Set(PIXEL_TO_METER(0.0f), PIXEL_TO_METER(0.0f));
-	verticesEsquina[1].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(0.0f));
-	verticesEsquina[2].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(125.0f));
-
-	b2PolygonShape esquinaShape;
-	esquinaShape.Set(verticesEsquina, 3);
-
-	b2FixtureDef esquinaFixture;
-	esquinaFixture.shape = &esquinaShape;
-	esquinaFixture.density = 1.0f;
-	esquinaFixture.friction = 0.0f;
-	esquinaFixture.restitution = 0.2f;
-	eB->CreateFixture(&esquinaFixture);
-
-	pbody->body = eB;
-
-	return pbody;
-}
+//PhysBody* ModulePhysics::CreatePinballEsquina(b2World* world)
+//{
+//	PhysBody* pbody = new PhysBody();
+//
+//	b2BodyDef esquinaBody;
+//	esquinaBody.type = b2_staticBody;
+//	esquinaBody.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
+//
+//	esquinaBody.position.Set(PIXEL_TO_METER(GetScreenWidth() / 3) * 2 - PIXEL_TO_METER(125), PIXEL_TO_METER(GetScreenHeight() / 10));
+//
+//	b2Body* eB = world->CreateBody(&esquinaBody);
+//
+//	b2Vec2 verticesEsquina[3];
+//	verticesEsquina[0].Set(PIXEL_TO_METER(0.0f), PIXEL_TO_METER(0.0f));
+//	verticesEsquina[1].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(0.0f));
+//	verticesEsquina[2].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(125.0f));
+//
+//	b2PolygonShape esquinaShape;
+//	esquinaShape.Set(verticesEsquina, 3);
+//
+//	b2FixtureDef esquinaFixture;
+//	esquinaFixture.shape = &esquinaShape;
+//	esquinaFixture.density = 1.0f;
+//	esquinaFixture.friction = 0.0f;
+//	esquinaFixture.restitution = 0.2f;
+//	eB->CreateFixture(&esquinaFixture);
+//
+//	pbody->body = eB;
+//
+//	return pbody;
+//}
 
 PhysBody* ModulePhysics::CreateCircle(int x, int y, int radius)
 {
@@ -749,7 +749,8 @@ void ModulePhysics::InstantiatePinball(b2World &world)
 	leftBumper = CreatePinballLeftBumper(&world);
 	rightBumper = CreatePinballRightBumper(&world);
 	shooter = CreatePinballShooter(&world);
-	esquina = CreatePinballEsquina(&world);
+	//esquina = CreatePinballEsquina(&world);
+			PhysBody* bezierCurve = CreatePinballCurva(&world);
 
 	// Añadir portal
 }
@@ -781,4 +782,63 @@ void ModulePhysics::BeginContact(b2Contact* contact)
 
 	if (b != NULL && b->listener != NULL)
 		b->listener->OnCollision(b, a);
+}
+
+// Evaluate a cubic Bezier at t in [0,1]
+static b2Vec2 CubicBezier(const b2Vec2& p0, const b2Vec2& p1,
+	const b2Vec2& p2, const b2Vec2& p3, float t)
+{
+	float u = 1.0f - t;
+	float uu = u * u;
+	float tt = t * t;
+
+	b2Vec2 p;
+	p.x = uu * u * p0.x + 3.0f * uu * t * p1.x + 3.0f * u * tt * p2.x + tt * t * p3.x;
+	p.y = uu * u * p0.y + 3.0f * uu * t * p1.y + 3.0f * u * tt * p2.y + tt * t * p3.y;
+	return p;
+}
+
+PhysBody* ModulePhysics::CreatePinballCurva(b2World* world)
+{
+	PhysBody* pbody = new PhysBody();
+
+	b2BodyDef curvaBody;
+	curvaBody.type = b2_staticBody;
+	curvaBody.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
+
+	// Same anchor as your corner; control points below are relative to it
+	curvaBody.position.Set(
+		PIXEL_TO_METER(GetScreenWidth() / 3) * 2 - PIXEL_TO_METER(125),
+		PIXEL_TO_METER(GetScreenHeight() / 10));
+
+	b2Body* cB = world->CreateBody(&curvaBody);
+
+	// Control points in pixels (local to the body)
+	// Rotated +90° (x' = 125 - y, y' = x), chain order still reversed
+	b2Vec2 p0(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(125.0f));  // start
+	b2Vec2 p1(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(40.0f));   // control 1
+	b2Vec2 p2(PIXEL_TO_METER(85.0f), PIXEL_TO_METER(0.0f));    // control 2
+	b2Vec2 p3(PIXEL_TO_METER(0.0f), PIXEL_TO_METER(0.0f));    // end
+
+	const int SEGMENTS = 24;                 // more = smoother
+	b2Vec2 points[SEGMENTS + 1];
+	for (int i = 0; i <= SEGMENTS; ++i)
+	{
+		float t = (float)i / (float)SEGMENTS;
+		points[i] = CubicBezier(p0, p1, p2, p3, t);
+	}
+
+	b2ChainShape curvaShape;
+	curvaShape.CreateChain(points, SEGMENTS + 1, points[0], points[SEGMENTS]); // ghost vertices
+
+	b2FixtureDef curvaFixture;
+	curvaFixture.shape = &curvaShape;
+	curvaFixture.density = 1.0f;
+	curvaFixture.friction = 0.0f;
+	curvaFixture.restitution = 0.2f;
+	cB->CreateFixture(&curvaFixture);
+
+	pbody->body = cB;
+
+	return pbody;
 }
