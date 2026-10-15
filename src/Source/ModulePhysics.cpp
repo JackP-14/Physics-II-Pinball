@@ -728,16 +728,16 @@ void ModulePhysics::DestroyBody(PhysBody* pbody)
 	delete pbody;                    // we free our own wrapper
 }
 
-void ModulePhysics::InstantiatePinball(b2World &world)
-{
-	outerWall = CreatePinballOuterWall(&world);
-	leftBumper = CreatePinballLeftBumper(&world);
-	rightBumper = CreatePinballRightBumper(&world);
-	shooter = CreatePinballShooter(&world);
-	esquina = CreatePinballEsquina(&world);
-
-	// Añadir portal
-}
+//void ModulePhysics::InstantiatePinball(b2World &world)
+//{
+//	outerWall = CreatePinballOuterWall(&world);
+//	leftBumper = CreatePinballLeftBumper(&world);
+//	rightBumper = CreatePinballRightBumper(&world);
+//	shooter = CreatePinballShooter(&world);
+//	esquina = CreatePinballEsquina(&world);
+//
+//	// Añadir portal
+//}
 
 void ModulePhysics::BeginContact(b2Contact* contact)
 {

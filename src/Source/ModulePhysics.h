@@ -75,7 +75,7 @@ public:
 
 	void BeginContact(b2Contact* contact) override;
 
-	void InstantiatePinball(b2World& world);
+	//void InstantiatePinball(b2World& world);
 
 private:
 	struct TeleportRequest {
