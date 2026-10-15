@@ -120,6 +120,99 @@ private:
 	Texture2D texture;
 };
 
+class LeftBumper : public PhysicEntity
+{
+public:
+	LeftBumper(ModulePhysics* physics, Texture2D _texture)
+		: PhysicEntity(physics->CreateLeftBumper())
+		, texture(_texture)
+	{
+
+	}
+
+	void Update() override
+	{
+		int x, y;
+		body->GetPosition(x, y);
+		x += 50;
+		y += 50;
+
+		// Red when the mouse is inside the body
+		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
+		tint.a = 50;
+		// Box2D positions are the center of the body: draw the texture around its center
+		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
+		Rectangle dest = { (float)x, (float)y, (float)texture.width, (float)texture.height };
+		Vector2 origin = { (float)texture.width / 2.0f, (float)texture.height / 2.0f };
+		DrawTexturePro(texture, source, dest, origin, body->GetRotation() * RAD2DEG, tint);
+	}
+
+private:
+	Texture2D texture;
+};
+
+class RightBumper : public PhysicEntity
+{
+public:
+	RightBumper(ModulePhysics* physics, Texture2D _texture)
+		: PhysicEntity(physics->CreateRightBumper())
+		, texture(_texture)
+	{
+
+	}
+
+	void Update() override
+	{
+		int x, y;
+		body->GetPosition(x, y);
+		x += 50;
+		y += 50;
+
+		// Red when the mouse is inside the body
+		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
+		tint.a = 50;
+		// Box2D positions are the center of the body: draw the texture around its center
+		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
+		Rectangle dest = { (float)x, (float)y, (float)texture.width , (float)texture.height };
+		Vector2 origin = { (float)texture.width / 2.0f, (float)texture.height / 2.0f };
+		DrawTexturePro(texture, source, dest, origin, body->GetRotation() * RAD2DEG, tint);
+	}
+
+private:
+	Texture2D texture;
+};
+
+class Shooter : public PhysicEntity
+{
+public:
+	Shooter(ModulePhysics* physics, Texture2D _texture)
+		: PhysicEntity(physics->CreateShooter())
+		, texture(_texture)
+	{
+
+	}
+
+	void Update() override
+	{
+		int x, y;
+		body->GetPosition(x, y);
+		x += 50;
+		y += 50;
+
+		// Red when the mouse is inside the body
+		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
+		tint.a = 50;
+		// Box2D positions are the center of the body: draw the texture around its center
+		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
+		Rectangle dest = { (float)x, (float)y, (float)texture.width , (float)texture.height };
+		Vector2 origin = { (float)texture.width / 2.0f, (float)texture.height / 2.0f };
+		DrawTexturePro(texture, source, dest, origin, body->GetRotation() * RAD2DEG, tint);
+	}
+
+private:
+	Texture2D texture;
+};
+
 class Box : public PhysicEntity
 {
 public:
@@ -255,16 +348,23 @@ bool ModuleGame::Start()
 	rick = LoadTexture("Assets/rick_head.png");
 	walls = LoadTexture("Assets/background.png");
 	esquina = LoadTexture("Assets/esquina.png");
-
+	bumper = LoadTexture("Assets/bumpers.png");
+	shooter = LoadTexture("Assets/shooter.png");
 	bonus_fx = App->audio->LoadFx("Assets/bonus.wav");
 
 	//Create the walls Entity Instance and push it back to the entity list
 	Walls* w = new Walls(App->physics, walls);
 	Esquina* e = new Esquina(App->physics, esquina);
-	//w->body->listener = this;
+	LeftBumper* l = new LeftBumper(App->physics, bumper);
+//	l->body->listener = this;
+	RightBumper* r = new RightBumper(App->physics, bumper);
+//	r->body->listener = this;
+	Shooter* s = new Shooter(App->physics, shooter);
 	entities.push_back(w);
 	entities.push_back(e);
-		
+	entities.push_back(l);
+	entities.push_back(r);
+	entities.push_back(s);
 
 	// Sensor at the bottom of the screen
 	sensor = App->physics->CreateRectangleSensor(SCREEN_WIDTH / 2, SCREEN_HEIGHT, SCREEN_WIDTH / 2, 25);
