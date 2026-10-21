@@ -22,6 +22,7 @@ typedef unsigned __int32 uint32;
 typedef unsigned __int64 uint64;
 typedef unsigned char uchar;
 
+
 enum update_status
 {
 	UPDATE_CONTINUE = 1,

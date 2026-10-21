@@ -31,13 +31,14 @@ public:
 
 	std::vector<PhysicEntity*> entities;
 
-	Texture2D circle;
+	Texture2D ball;
 	Texture2D box;
 	Texture2D rick;
 	Texture2D walls;
 	Texture2D esquina;
 	Texture2D bumper;
 	Texture2D shooter;
+	Texture2D pumpkin;
 	uint32 bonus_fx;
 
 	vec2<int> ray;

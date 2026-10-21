@@ -28,11 +28,40 @@ public:
 	PhysBody* body;
 };
 
-class Circle : public PhysicEntity
+class Ball : public PhysicEntity
 {
 public:
-	Circle(ModulePhysics* physics, int _x, int _y, Texture2D _texture)
-		: PhysicEntity(physics->CreateCircle(_x, _y, 25))
+	Ball(ModulePhysics* physics, int _x, int _y, Texture2D _texture)
+		: PhysicEntity(physics->CreateBall(_x, _y, 15))
+		, texture(_texture)
+	{
+
+	}
+
+	void Update() override
+	{
+		int x, y;
+		body->GetPosition(x, y);
+
+		// Red when the mouse is inside the body
+		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
+
+		// Box2D positions are the center of the body: draw the texture around its center
+		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
+		Rectangle dest = { (float)x, (float)y, (float)texture.width/2, (float)texture.height/2 };
+		Vector2 origin = { (float)texture.width / 4.0f, (float)texture.height / 4.0f };
+		DrawTexturePro(texture, source, dest, origin, body->GetRotation() * RAD2DEG, tint);
+	}
+
+private:
+	Texture2D texture;
+};
+
+class Pumpkin : public PhysicEntity
+{
+public:
+	Pumpkin(ModulePhysics* physics, int _x, int _y, Texture2D _texture)
+		: PhysicEntity(physics->CreatePumpkin(_x, _y, 25))
 		, texture(_texture)
 	{
 
@@ -76,7 +105,7 @@ public:
 
 		// Red when the mouse is inside the body
 		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
-		tint.a = 50;
+		//tint.a = 50;
 
 		// Box2D positions are the center of the body: draw the texture around its center
 		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
@@ -108,7 +137,7 @@ public:
 
 		// Red when the mouse is inside the body
 		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
-		tint.a = 50;
+		//tint.a = 50;
 		// Box2D positions are the center of the body: draw the texture around its center
 		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
 		Rectangle dest = { (float)x, (float)y, (float)texture.width , (float)texture.height };
@@ -134,12 +163,12 @@ public:
 	{
 		int x, y;
 		body->GetPosition(x, y);
-		x += 50;
-		y += 50;
+		x += 10;
+		y += 5;
 
 		// Red when the mouse is inside the body
 		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
-		tint.a = 50;
+		//tint.a = 50;
 		// Box2D positions are the center of the body: draw the texture around its center
 		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
 		Rectangle dest = { (float)x, (float)y, (float)texture.width, (float)texture.height };
@@ -165,12 +194,12 @@ public:
 	{
 		int x, y;
 		body->GetPosition(x, y);
-		x += 50;
-		y += 50;
+		x += 10;
+		y += 5;
 
 		// Red when the mouse is inside the body
 		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
-		tint.a = 50;
+		//tint.a = 50;
 		// Box2D positions are the center of the body: draw the texture around its center
 		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
 		Rectangle dest = { (float)x, (float)y, (float)texture.width , (float)texture.height };
@@ -201,7 +230,7 @@ public:
 
 		// Red when the mouse is inside the body
 		Color tint = body->Contains(GetMouseX(), GetMouseY()) ? RED : WHITE;
-		tint.a = 50;
+		//tint.a = 50;
 		// Box2D positions are the center of the body: draw the texture around its center
 		Rectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
 		Rectangle dest = { (float)x, (float)y, (float)texture.width , (float)texture.height };
@@ -343,13 +372,14 @@ bool ModuleGame::Start()
 
 	App->renderer->camera.x = App->renderer->camera.y = 0;
 
-	circle = LoadTexture("Assets/wheel.png");
+	ball = LoadTexture("Assets/wheel.png");
 	box = LoadTexture("Assets/crate.png");
 	rick = LoadTexture("Assets/rick_head.png");
 	walls = LoadTexture("Assets/background.png");
 	esquina = LoadTexture("Assets/esquina.png");
-	bumper = LoadTexture("Assets/bumpers.png");
+	bumper = LoadTexture("Assets/escoba.png");
 	shooter = LoadTexture("Assets/shooter.png");
+	pumpkin = LoadTexture("Assets/calabaza.png");
 	bonus_fx = App->audio->LoadFx("Assets/bonus.wav");
 
 	//Create the walls Entity Instance and push it back to the entity list
@@ -360,14 +390,22 @@ bool ModuleGame::Start()
 	RightBumper* r = new RightBumper(App->physics, bumper);
 //	r->body->listener = this;
 	Shooter* s = new Shooter(App->physics, shooter);
+	Pumpkin* p1 = new Pumpkin(App->physics, 500, 300, pumpkin);
+	Pumpkin* p2 = new Pumpkin(App->physics, 600, 450, pumpkin);
+	Pumpkin* p3 = new Pumpkin(App->physics, 670, 400, pumpkin);
+
 	entities.push_back(w);
 	entities.push_back(e);
 	entities.push_back(l);
 	entities.push_back(r);
 	entities.push_back(s);
+	entities.push_back(p1);
+	entities.push_back(p2);
+	entities.push_back(p3);
+
 
 	// Sensor at the bottom of the screen
-	sensor = App->physics->CreateRectangleSensor(SCREEN_WIDTH / 2, SCREEN_HEIGHT, SCREEN_WIDTH / 2, 25);
+	sensor = App->physics->CreateRectangleSensor(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 30, SCREEN_WIDTH / 2, 25);
 	sensor->listener = this;
 
 	return ret;
@@ -383,9 +421,14 @@ bool ModuleGame::CleanUp()
 	App->physics->DestroyBody(sensor);
 	sensor = NULL;
 
-	UnloadTexture(circle);
+	UnloadTexture(ball);
 	UnloadTexture(box);
 	UnloadTexture(rick);
+	UnloadTexture(walls);
+	UnloadTexture(esquina);
+	UnloadTexture(bumper);
+	UnloadTexture(shooter);
+	UnloadTexture(pumpkin);
 
 	return true;
 }
@@ -428,7 +471,7 @@ update_status ModuleGame::Update()
 
 	if (IsKeyPressed(KEY_ONE))
 	{
-		Circle* c = new Circle(App->physics, GetMouseX(), GetMouseY(), circle);
+		Ball* c = new Ball(App->physics, GetMouseX(), GetMouseY(), ball);
 		c->body->listener = this;
 		entities.push_back(c);
 	}

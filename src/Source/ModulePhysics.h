@@ -64,7 +64,8 @@ public:
 
 	PhysBody* CreatePinballEsquina(b2World* world);
 
-	PhysBody* CreateCircle(int x, int y, int radius);
+	PhysBody* CreateBall(int x, int y, int radius);
+	PhysBody* CreatePumpkin(int x, int y, int radius);
 
 	PhysBody* CreateWalls();
 	PhysBody* CreateEsquina();
