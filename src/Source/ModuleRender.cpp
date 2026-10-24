@@ -22,22 +22,21 @@ bool ModuleRender::Init()
 	return ret;
 }
 
-// PreUpdate: clear buffer
+// PreUpdate: start the frame and clear buffer, before any module draws in Update()
 update_status ModuleRender::PreUpdate()
 {
-	return UPDATE_CONTINUE;
-}
-
-// Update: debug camera
-update_status ModuleRender::Update()
-{
-    ClearBackground(background);
-
     // NOTE: This function setups render batching system for
     // maximum performance, all consecutive Draw() calls are
     // not processed until EndDrawing() is called
     BeginDrawing();
 
+    ClearBackground(background);
+
+	return UPDATE_CONTINUE;
+}
+
+update_status ModuleRender::Update()
+{
 	return UPDATE_CONTINUE;
 }
 

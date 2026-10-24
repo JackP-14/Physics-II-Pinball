@@ -5,6 +5,10 @@
 
 #include <stdlib.h>
 
+#ifdef _DEBUG
+#include <crtdbg.h>
+#endif
+
 enum main_states
 {
 	MAIN_CREATION,
@@ -16,16 +20,16 @@ enum main_states
 
 int main(int argc, char ** argv)
 {
+#ifdef _DEBUG
+	// Report any memory leak in the Output window when the program exits
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+
 	LOG("Starting game '%s'...", TITLE);
 
 	int main_return = EXIT_FAILURE;
 	main_states state = MAIN_CREATION;
 	Application* App = NULL;
-
-	// He tenido que poner este SetTargetFPS porque en mi 
-	// pc me iba a tantos FPS que la fisica se rompia
-	// Nil
-	SetTargetFPS(60);
 
 	while (state != MAIN_EXIT)
 	{

@@ -6,21 +6,25 @@
 #include "p2Point.h"
 
 #include <math.h>
-#include <algorithm>
 
+// Flippers
+#define FLIPPER_MOTOR_SPEED 20.0f     // rad/s
+#define FLIPPER_MOTOR_TORQUE 1500.0f  // N*m
+#define FLIPPER_REST_ANGLE 33.0f      // degrees below the horizontal (as painted on the table)
+#define FLIPPER_SWING_ANGLE 60.0f     // degrees it travels when pressed
+
+// Kicker
+#define KICKER_PULL_SPEED 1.5f        // m/s while the key is held
+#define KICKER_LAUNCH_SPEED 20.0f     // m/s at full pull
+#define KICKER_MOTOR_FORCE 2000.0f    // N
 
 ModulePhysics::ModulePhysics(Application* app, bool start_enabled) : Module(app, start_enabled)
 {
 	world = NULL;
 	ground = NULL;
 	mouse_joint = NULL;
-	bumperJoint1 = NULL;
-	bumperJoint2 = NULL;
-	shooterSpringJoint = NULL;
-
-	portalIn = NULL;
-	portalOut = b2Vec2(0.0f, 0.0f);
-	debug = true;
+	debug = false;
+	time_accumulator = 0.0f;
 }
 
 // Destructor
@@ -32,12 +36,13 @@ bool ModulePhysics::Start()
 {
 	LOG("Creating Physics 2D environment");
 
-	world = new b2World(b2Vec2(GRAVITY_X, -GRAVITY_Y));
+	world = new b2World(b2Vec2(GRAVITY_X, GRAVITY_Y));
 
 	world->SetContinuousPhysics(true); // Enables TOI in the world
 
 	world->SetContactListener(this); // Enables contact functions inside the world
 
+	// Static body used as anchor for every joint (mouse, flippers, kicker)
 	b2BodyDef bd;
 	ground = world->CreateBody(&bd);
 
@@ -46,54 +51,25 @@ bool ModulePhysics::Start()
 
 update_status ModulePhysics::PreUpdate()
 {
-	// Execute pending teleports: the world is NOT locked here (we are outside Step)
-	for (const TeleportRequest& t : teleports)
-	{
-		b2Body* b = t.body->body;
-		b->SetTransform(t.target, b->GetAngle());
-		b->SetAwake(true);
-	}
-	teleports.clear();
+	// Fixed timestep: we consume the real elapsed time in constant steps,
+	// so the simulation runs at the same speed whatever the target FPS is
+	float frame_time = GetFrameTime();
+	if (frame_time > PHYSICS_MAX_FRAME_TIME)
+		frame_time = PHYSICS_MAX_FRAME_TIME;
 
-	world->Step(1.0f / 60.0f, 8, 3);
+	time_accumulator += frame_time;
+
+	while (time_accumulator >= PHYSICS_TIMESTEP)
+	{
+		world->Step(PHYSICS_TIMESTEP, 8, 3);
+		time_accumulator -= PHYSICS_TIMESTEP;
+	}
 
 	return UPDATE_CONTINUE;
 }
 
 update_status ModulePhysics::PostUpdate()
 {
-	if (IsKeyPressed(KEY_SPACE))
-	{
-		CreateCircle(GetMouseX(), GetMouseY(), 10);
-	}
-
-	if (IsKeyDown(KEY_A))
-	{
-		bumperJoint1->SetMotorSpeed(-60.0f);
-	}
-	else
-	{
-		bumperJoint1->SetMotorSpeed(60.0f);
-	}
-
-	if (IsKeyDown(KEY_D))
-	{
-		bumperJoint2->SetMotorSpeed(60.0f);
-	}
-	else
-	{
-		bumperJoint2->SetMotorSpeed(-60.0f);
-	}
-
-	if (IsKeyDown(KEY_S))
-	{
-		shooterSpringJoint->SetMotorSpeed(3.0f);
-	}
-	else
-	{
-		shooterSpringJoint->SetMotorSpeed(-60.0f);
-	}
-
 	if (IsKeyPressed(KEY_F1))
 	{
 		debug = !debug;
@@ -109,11 +85,34 @@ update_status ModulePhysics::PostUpdate()
 		return UPDATE_CONTINUE;
 	}
 
-	b2Vec2 mouse_position(PIXEL_TO_METER(GetMouseX()), PIXEL_TO_METER(GetMouseY()));
-	b2Body* body_clicked = NULL;
+	DrawDebug();
+	UpdateMouseJoint();
 
-	// Bonus code: this will iterate all objects in the world and draw the circles
-	
+	return UPDATE_CONTINUE;
+}
+
+// Called before quitting
+bool ModulePhysics::CleanUp()
+{
+	LOG("Destroying physics world");
+
+	// Free the wrappers of any body still alive (Box2D only frees its own data)
+	for (b2Body* b = world->GetBodyList(); b; b = b->GetNext())
+	{
+		delete (PhysBody*)b->GetUserData().pointer;
+	}
+
+	// Delete the whole physics world! (this also frees every body, fixture and joint it owns)
+	delete world;
+	world = NULL;
+	ground = NULL;
+	mouse_joint = NULL;
+
+	return true;
+}
+
+void ModulePhysics::DrawDebug()
+{
 	for (b2Body* b = world->GetBodyList(); b; b = b->GetNext())
 	{
 		for (b2Fixture* f = b->GetFixtureList(); f; f = f->GetNext())
@@ -124,9 +123,9 @@ update_status ModulePhysics::PostUpdate()
 			case b2Shape::e_circle:
 			{
 				b2CircleShape* shape = (b2CircleShape*)f->GetShape();
-				b2Vec2 pos = f->GetBody()->GetPosition();
+				b2Vec2 pos = b->GetWorldPoint(shape->m_p);
 
-				DrawCircle(METER_TO_PIXEL(pos.x), METER_TO_PIXEL(pos.y), (float)METER_TO_PIXEL(shape->m_radius), Color{ 0, 0, 0, 128 });
+				DrawCircleLines(METER_TO_PIXEL(pos.x), METER_TO_PIXEL(pos.y), (float)METER_TO_PIXEL(shape->m_radius), f->IsSensor() ? YELLOW : MAGENTA);
 			}
 			break;
 
@@ -141,13 +140,13 @@ update_status ModulePhysics::PostUpdate()
 				{
 					v = b->GetWorldPoint(polygonShape->m_vertices[i]);
 					if (i > 0)
-						DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), RED);
+						DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), f->IsSensor() ? YELLOW : RED);
 
 					prev = v;
 				}
 
 				v = b->GetWorldPoint(polygonShape->m_vertices[0]);
-				DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), RED);
+				DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), f->IsSensor() ? YELLOW : RED);
 			}
 			break;
 
@@ -164,9 +163,6 @@ update_status ModulePhysics::PostUpdate()
 						DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), GREEN);
 					prev = v;
 				}
-
-				v = b->GetWorldPoint(shape->m_vertices[0]);
-				DrawLine(METER_TO_PIXEL(prev.x), METER_TO_PIXEL(prev.y), METER_TO_PIXEL(v.x), METER_TO_PIXEL(v.y), GREEN);
 			}
 			break;
 
@@ -182,33 +178,52 @@ update_status ModulePhysics::PostUpdate()
 			}
 			break;
 			}
-
-			if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && mouse_joint == NULL && body_clicked == NULL
-				&& b->GetType() == b2_dynamicBody && f->TestPoint(mouse_position))
-			{
-				body_clicked = b;
-			}
 		}
 	}
+}
 
-	if (body_clicked != NULL)
+void ModulePhysics::UpdateMouseJoint()
+{
+	b2Vec2 mouse_position(PIXEL_TO_METER(GetMouseX()), PIXEL_TO_METER(GetMouseY()));
+
+	if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && mouse_joint == NULL)
 	{
-		b2MouseJointDef def;
-		def.bodyA = ground;
-		def.bodyB = body_clicked;
-		def.target = mouse_position;
-		def.maxForce = 100000000000.0f * body_clicked->GetMass(); // Max force of the mouse-dragged object
-		b2LinearStiffness(def.stiffness, def.damping, 20.0f, 1.0f, def.bodyA, def.bodyB);
+		b2Body* body_clicked = NULL;
 
-		mouse_joint = (b2MouseJoint*)world->CreateJoint(&def);
-		body_clicked->SetAwake(true);
+		for (b2Body* b = world->GetBodyList(); b && body_clicked == NULL; b = b->GetNext())
+		{
+			if (b->GetType() != b2_dynamicBody)
+				continue;
+
+			for (b2Fixture* f = b->GetFixtureList(); f; f = f->GetNext())
+			{
+				if (f->TestPoint(mouse_position))
+				{
+					body_clicked = b;
+					break;
+				}
+			}
+		}
+
+		if (body_clicked != NULL)
+		{
+			b2MouseJointDef def;
+			def.bodyA = ground;
+			def.bodyB = body_clicked;
+			def.target = mouse_position;
+			def.maxForce = 1000.0f * body_clicked->GetMass();
+			b2LinearStiffness(def.stiffness, def.damping, 5.0f, 0.7f, def.bodyA, def.bodyB);
+
+			mouse_joint = (b2MouseJoint*)world->CreateJoint(&def);
+			body_clicked->SetAwake(true);
+		}
 	}
 
 	if (mouse_joint != NULL && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
 	{
 		mouse_joint->SetTarget(mouse_position);
 
-		b2Vec2 anchor_a = mouse_joint->GetAnchorA(); // the target
+		b2Vec2 anchor_a = mouse_joint->GetTarget();  // the mouse
 		b2Vec2 anchor_b = mouse_joint->GetAnchorB(); // the point of the body we clicked
 		DrawLine(METER_TO_PIXEL(anchor_a.x), METER_TO_PIXEL(anchor_a.y), METER_TO_PIXEL(anchor_b.x), METER_TO_PIXEL(anchor_b.y), RED);
 	}
@@ -218,230 +233,8 @@ update_status ModulePhysics::PostUpdate()
 		world->DestroyJoint(mouse_joint);
 		mouse_joint = NULL;
 	}
-
-
-	return UPDATE_CONTINUE;
 }
 
-
-// Called before quitting
-bool ModulePhysics::CleanUp()
-{
-	LOG("Destroying physics world");
-
-	teleports.clear();
-
-	// Delete the whole physics world! (this also frees every body, fixture and joint it owns)
-	delete world;
-	world = NULL;
-
-	//the portal sensor wrapper is ours
-	delete portalIn;
-	portalIn = NULL;
-
-	return true;
-}
-
-/*
-void ModulePhysics::CreatePinball(b2World* world)
-{
-	// Spawn main Pinball body
-	b2BodyDef pinballBody;
-	pinballBody.type = b2_staticBody;
-
-	//pinballBody.position.Set(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-	pinballBody.position.Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 10));
-	
-	//b2Body* p = world->CreateBody(&pinballBody);
-
-	//b2Vec2 vertices[4];
-	//vertices[0].Set(0.0f, 0.0f);
-	//vertices[1].Set(0.0f, PIXEL_TO_METER(GetScreenHeight() / 1.2));
-	//vertices[2].Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 1.2));
-	//vertices[3].Set(PIXEL_TO_METER(GetScreenWidth() / 3), 0.0f);
-
-	//b2ChainShape pinballShape;
-	//pinballShape.CreateLoop(vertices, 4);
-
-	//b2FixtureDef pinballFixture;
-	//pinballFixture.shape = &pinballShape;
-	//pinballFixture.density = 1.0f;
-	//pinballFixture.friction = 0.0f;
-	//pinballFixture.restitution = 0.2f;
-	//p->CreateFixture(&pinballFixture);
-
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	/*b2BodyDef esquinaBody;
-	esquinaBody.type = b2_staticBody;
-
-	esquinaBody.position.Set(pinballBody.position.x * 2 - PIXEL_TO_METER(125), pinballBody.position.y);
-
-	b2Body* eB = world->CreateBody(&esquinaBody);
-
-	b2Vec2 verticesEsquina[3];
-	verticesEsquina[0].Set(PIXEL_TO_METER(0.0f), PIXEL_TO_METER(0.0f));
-	verticesEsquina[1].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(0.0f));
-	verticesEsquina[2].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(125.0f));
-
-	b2PolygonShape esquinaShape;
-	esquinaShape.Set(verticesEsquina, 3);
-
-	b2FixtureDef esquinaFixture;
-	esquinaFixture.shape = &esquinaShape;
-	esquinaFixture.density = 1.0f;
-	esquinaFixture.friction = 0.0f;
-	esquinaFixture.restitution = 0.2f;
-	eB->CreateFixture(&esquinaFixture);
-
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	b2BodyDef bumperBody;
-	bumperBody.type = b2_dynamicBody;
-
-	bumperBody.position.Set(PIXEL_TO_METER(525), PIXEL_TO_METER(550));
-
-	b2Body* bumper = world->CreateBody(&bumperBody);
-
-	b2Vec2 verticesBumper[3];
-	verticesBumper[0].Set(PIXEL_TO_METER(-6.25f), PIXEL_TO_METER(10.825f));
-	verticesBumper[1].Set(PIXEL_TO_METER(6.25f), PIXEL_TO_METER(-10.825f));
-	verticesBumper[2].Set(PIXEL_TO_METER(64.952f), PIXEL_TO_METER(37.5f));
-
-	b2PolygonShape bumperShape;
-	bumperShape.Set(verticesBumper, 3);
-
-	b2FixtureDef bumperFixture;
-	bumperFixture.shape = &bumperShape;
-	bumperFixture.density = 1.0f;
-	bumperFixture.friction = 0.0f;
-	bumperFixture.restitution = 1.0f;
-	bumper->CreateFixture(&bumperFixture);
-
-	b2BodyDef anchorDef1;
-	anchorDef1.type = b2_kinematicBody;
-
-	anchorDef1.position.Set(bumperBody.position.x, bumperBody.position.y);
-
-	b2Body* anchor1 = world->CreateBody(&anchorDef1);
-
-	b2CircleShape anchorShape;
-	anchorShape.m_radius = PIXEL_TO_METER(1.0f);
-
-	b2FixtureDef anchorFixture;
-	anchorFixture.shape = &anchorShape;
-	anchorFixture.density = 0.0f;
-	anchorFixture.restitution = 0.0f;
-	anchor1->CreateFixture(&anchorFixture);
-
-	b2RevoluteJointDef revoluteJointBumper;
-	revoluteJointBumper.Initialize(anchor1, bumper, anchor1->GetWorldCenter());
-
-	revoluteJointBumper.enableLimit = true;
-	revoluteJointBumper.lowerAngle = -60 * b2_pi / 180;
-	revoluteJointBumper.upperAngle = 0 * b2_pi / 180;
-
-	revoluteJointBumper.enableMotor = true;
-	revoluteJointBumper.maxMotorTorque = 1000.0f;
-	revoluteJointBumper.motorSpeed = 0.0f;
-
-	bumperJoint1 = (b2RevoluteJoint*)world->CreateJoint(&revoluteJointBumper);
-
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	b2BodyDef bumperBody2;
-	bumperBody2.type = b2_dynamicBody;
-	bumperBody2.position.Set(PIXEL_TO_METER(750), PIXEL_TO_METER(550));
-
-	b2Body* bumper2 = world->CreateBody(&bumperBody2);
-
-	b2Vec2 verticesBumper2[3];
-	verticesBumper2[0].Set(PIXEL_TO_METER(6.25f), PIXEL_TO_METER(10.825f));
-	verticesBumper2[1].Set(PIXEL_TO_METER(-6.25f), PIXEL_TO_METER(-10.825f));
-	verticesBumper2[2].Set(PIXEL_TO_METER(-64.952f), PIXEL_TO_METER(37.5f));
-
-	b2PolygonShape bumperShape2;
-	bumperShape2.Set(verticesBumper2, 3);
-
-	b2FixtureDef bumperFixture2;
-	bumperFixture2.shape = &bumperShape2;
-	bumperFixture2.density = 1.0f;
-	bumperFixture2.friction = 0.0f;
-	bumperFixture2.restitution = 1.0f;
-	bumper2->CreateFixture(&bumperFixture2);
-
-	b2BodyDef anchorDef2;
-	anchorDef2.type = b2_kinematicBody;
-	anchorDef2.position.Set(bumperBody2.position.x, bumperBody2.position.y);
-	b2Body* anchor2 = world->CreateBody(&anchorDef2);
-
-	b2CircleShape anchorShape2;
-	anchorShape2.m_radius = PIXEL_TO_METER(1.0f);
-
-	b2FixtureDef anchorFixture2;
-	anchorFixture2.shape = &anchorShape2;
-	anchorFixture2.density = 0.0f;
-	anchorFixture2.restitution = 0.0f;
-	anchor2->CreateFixture(&anchorFixture2);
-
-	b2RevoluteJointDef revoluteJointBumper2;
-	revoluteJointBumper2.Initialize(anchor2, bumper2, anchor2->GetWorldCenter());
-	revoluteJointBumper2.enableLimit = true;
-	revoluteJointBumper2.lowerAngle = 0 * b2_pi / 180;     // mirrored: 0 to +60
-	revoluteJointBumper2.upperAngle = 60 * b2_pi / 180;
-	revoluteJointBumper2.enableMotor = true;
-	revoluteJointBumper2.maxMotorTorque = 1000.0f;
-	revoluteJointBumper2.motorSpeed = 0.0f;
-
-	bumperJoint2 = (b2RevoluteJoint*)world->CreateJoint(&revoluteJointBumper2);
-
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	b2BodyDef anchorShooterSpringDef;
-	anchorShooterSpringDef.type = b2_staticBody;
-	anchorShooterSpringDef.position.Set(pinballBody.position.x * 2 - PIXEL_TO_METER(30), pinballBody.position.y + PIXEL_TO_METER(GetScreenHeight() / 1.2) - PIXEL_TO_METER(10.0f));
-	b2Body* anchorShooterSpring = world->CreateBody(&anchorShooterSpringDef);
-
-	b2CircleShape anchorShooterSpringShape;
-	anchorShooterSpringShape.m_radius = PIXEL_TO_METER(1.0f);
-
-	b2FixtureDef anchorShooterSpringFixture;
-	anchorShooterSpringFixture.shape = &anchorShooterSpringShape;
-	anchorShooterSpringFixture.density = 0.0f;
-	anchorShooterSpringFixture.restitution = 0.0f;
-	anchorShooterSpring->CreateFixture(&anchorShooterSpringFixture);
-
-
-	b2BodyDef shooterSpringDef;
-	shooterSpringDef.type = b2_dynamicBody;
-	shooterSpringDef.position.Set(anchorShooterSpring->GetPosition().x, pinballBody.position.y + PIXEL_TO_METER(GetScreenHeight() / 1.2) - PIXEL_TO_METER(100.0f));
-
-	b2Body* shooterSpring = world->CreateBody(&shooterSpringDef);
-
-	b2PolygonShape shooterSpringShape;
-	shooterSpringShape.SetAsBox(PIXEL_TO_METER(30.0f), PIXEL_TO_METER(7.5f));
-
-	b2FixtureDef shooterSpringFixture;
-	shooterSpringFixture.shape = &shooterSpringShape;
-	shooterSpringFixture.density = 1.0f;
-	shooterSpringFixture.friction = 0.0f;
-	shooterSpringFixture.restitution = 1.0f;
-	shooterSpring->CreateFixture(&shooterSpringFixture);
-
-
-	b2PrismaticJointDef shooterSpringJointDef;
-	b2Vec2 worldAxis(0.0f, 1.0f);
-	shooterSpringJointDef.Initialize(anchorShooterSpring, shooterSpring, anchorShooterSpring->GetWorldCenter(), worldAxis);
-	shooterSpringJointDef.lowerTranslation = PIXEL_TO_METER(-20.0f);
-	shooterSpringJointDef.upperTranslation = PIXEL_TO_METER(50.0f);
-	shooterSpringJointDef.enableLimit = true;
-	shooterSpringJointDef.maxMotorForce = 500.0f;
-	shooterSpringJointDef.motorSpeed = 0.0f;
-	shooterSpringJointDef.enableMotor = true;
-
-	shooterSpringJoint = (b2PrismaticJoint*)world->CreateJoint(&shooterSpringJointDef);
-}	 
-*/
 PhysBody* ModulePhysics::CreateCircle(int x, int y, int radius)
 {
 	PhysBody* pbody = new PhysBody();
@@ -460,6 +253,8 @@ PhysBody* ModulePhysics::CreateCircle(int x, int y, int radius)
 	b2FixtureDef fixture;
 	fixture.shape = &shape;
 	fixture.density = 1.0f;
+	fixture.friction = 0.1f;
+	fixture.restitution = 0.3f;
 	b->CreateFixture(&fixture);
 
 	pbody->body = b;
@@ -467,303 +262,416 @@ PhysBody* ModulePhysics::CreateCircle(int x, int y, int radius)
 	return pbody;
 }
 
-PhysBody* ModulePhysics::CreateWalls() 
+PhysBody* ModulePhysics::CreateRectangle(int x, int y, int width, int height)
 {
-	PhysBody* pbody = new PhysBody(); 
-	// Spawn main Pinball body
+	PhysBody* pbody = new PhysBody();
 
-	b2BodyDef pinballBody;
-	pinballBody.type = b2_staticBody;
+	b2BodyDef body;
+	body.type = b2_dynamicBody;
+	body.position.Set(PIXEL_TO_METER(x), PIXEL_TO_METER(y));
+	body.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
 
-	//pinballBody.position.Set(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-	pinballBody.position.Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 10));
+	b2Body* b = world->CreateBody(&body);
 
-	b2Body* p = world->CreateBody(&pinballBody);
+	b2PolygonShape box;
+	box.SetAsBox(PIXEL_TO_METER(width) * 0.5f, PIXEL_TO_METER(height) * 0.5f);
+
+	b2FixtureDef fixture;
+	fixture.shape = &box;
+	fixture.density = 1.0f;
+	b->CreateFixture(&fixture);
+
+	pbody->body = b;
+
+	return pbody;
+}
+
+PhysBody* ModulePhysics::CreateRectangleSensor(int x, int y, int half_width, int half_height)
+{
+	PhysBody* pbody = new PhysBody();
+
+	b2BodyDef body;
+	body.type = b2_staticBody;
+	body.position.Set(PIXEL_TO_METER(x), PIXEL_TO_METER(y));
+	body.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
+
+	b2Body* b = world->CreateBody(&body);
+
+	b2PolygonShape box;
+	box.SetAsBox(PIXEL_TO_METER(half_width), PIXEL_TO_METER(half_height));
+
+	b2FixtureDef fixture;
+	fixture.shape = &box;
+	fixture.isSensor = true;
+	b->CreateFixture(&fixture);
+
+	pbody->body = b;
+
+	return pbody;
+}
+
+PhysBody* ModulePhysics::CreateChain(const int* points, int size, bool loop, float restitution)
+{
+	PhysBody* pbody = new PhysBody();
+
+	b2BodyDef body;
+	body.type = b2_staticBody;
+	body.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
+
+	b2Body* b = world->CreateBody(&body);
+
+	// points is a flat list: x0, y0, x1, y1, ...
+	int count = size / 2;
+	b2Vec2* vertices = new b2Vec2[count];
+	for (int i = 0; i < count; ++i)
+	{
+		vertices[i].Set(PIXEL_TO_METER(points[i * 2]), PIXEL_TO_METER(points[i * 2 + 1]));
+	}
+
+	b2ChainShape shape;
+	if (loop)
+		shape.CreateLoop(vertices, count);
+	else
+		shape.CreateChain(vertices, count, vertices[0], vertices[count - 1]);
+
+	delete[] vertices; // the shape keeps its own copy
+
+	b2FixtureDef fixture;
+	fixture.shape = &shape;
+	fixture.friction = 0.0f;
+	fixture.restitution = restitution;
+	b->CreateFixture(&fixture);
+
+	pbody->body = b;
+
+	return pbody;
+}
+
+PhysBody* ModulePhysics::CreateWall(const int* points, int size, float restitution)
+{
+	PhysBody* pbody = new PhysBody();
+
+	b2BodyDef body;
+	body.type = b2_staticBody;
+	body.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
+
+	b2Body* b = world->CreateBody(&body);
+
+	b2FixtureDef fixture;
+	fixture.friction = 0.0f;
+	fixture.restitution = restitution;
+
+	// One two-sided edge per segment: x0, y0, x1, y1, ...
+	for (int i = 0; i + 3 < size; i += 2)
+	{
+		b2EdgeShape edge;
+		edge.SetTwoSided(b2Vec2(PIXEL_TO_METER(points[i]), PIXEL_TO_METER(points[i + 1])),
+			b2Vec2(PIXEL_TO_METER(points[i + 2]), PIXEL_TO_METER(points[i + 3])));
+
+		fixture.shape = &edge;
+		b->CreateFixture(&fixture);
+	}
+
+	pbody->body = b;
+
+	return pbody;
+}
+
+PhysBody* ModulePhysics::CreateStaticCircle(int x, int y, int radius, float restitution)
+{
+	PhysBody* pbody = new PhysBody();
+
+	b2BodyDef body;
+	body.type = b2_staticBody;
+	body.position.Set(PIXEL_TO_METER(x), PIXEL_TO_METER(y));
+	body.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
+
+	b2Body* b = world->CreateBody(&body);
+
+	b2CircleShape shape;
+	shape.m_radius = PIXEL_TO_METER(radius);
+
+	b2FixtureDef fixture;
+	fixture.shape = &shape;
+	fixture.restitution = restitution;
+	b->CreateFixture(&fixture);
+
+	pbody->body = b;
+
+	return pbody;
+}
+
+PhysBody* ModulePhysics::CreateFlipper(int x, int y, int length, bool left)
+{
+	PhysBody* pbody = new PhysBody();
+
+	// The body origin is the pivot. Box2D angles grow clockwise on screen (Y points down),
+	// so the left flipper rests at +REST and the right one (pointing -X) at -REST
+	float rest_angle = FLIPPER_REST_ANGLE * DEGTORAD;
+
+	b2BodyDef body;
+	body.type = b2_dynamicBody;
+	body.bullet = true;
+	body.position.Set(PIXEL_TO_METER(x), PIXEL_TO_METER(y));
+	body.angle = left ? rest_angle : -rest_angle;
+	body.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
+
+	b2Body* b = world->CreateBody(&body);
+
+	// Tapered shape: a thick circle at the pivot, a thin one at the tip and a trapezoid between them
+	float direction = left ? 1.0f : -1.0f;
+	float len = PIXEL_TO_METER(length);
+	float pivot_radius = len * 0.18f;
+	float tip_radius = len * 0.08f;
+
+	b2FixtureDef fixture;
+	fixture.density = 2.0f;
+	fixture.friction = 0.1f;
+	fixture.restitution = 0.1f;
+
+	b2CircleShape pivot_shape;
+	pivot_shape.m_radius = pivot_radius;
+	fixture.shape = &pivot_shape;
+	b->CreateFixture(&fixture);
+
+	b2CircleShape tip_shape;
+	tip_shape.m_p.Set(direction * len, 0.0f);
+	tip_shape.m_radius = tip_radius;
+	fixture.shape = &tip_shape;
+	b->CreateFixture(&fixture);
 
 	b2Vec2 vertices[4];
-	vertices[0].Set(0.0f, 0.0f);
-	vertices[1].Set(0.0f, PIXEL_TO_METER(GetScreenHeight() / 1.2));
-	vertices[2].Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 1.2));
-	vertices[3].Set(PIXEL_TO_METER(GetScreenWidth() / 3), 0.0f);
+	vertices[0].Set(0.0f, -pivot_radius);
+	vertices[1].Set(direction * len, -tip_radius);
+	vertices[2].Set(direction * len, tip_radius);
+	vertices[3].Set(0.0f, pivot_radius);
 
-	b2ChainShape pinballShape;
-	pinballShape.CreateLoop(vertices, 4);
+	b2PolygonShape body_shape;
+	body_shape.Set(vertices, 4);
+	fixture.shape = &body_shape;
+	b->CreateFixture(&fixture);
 
-	b2FixtureDef pinballFixture;
-	pinballFixture.shape = &pinballShape;
-	pinballFixture.density = 1.0f;
-	pinballFixture.friction = 0.0f;
-	pinballFixture.restitution = 0.2f;
-	p->CreateFixture(&pinballFixture);
+	// Revolute joint against the ground. Joint angle 0 = rest position
+	b2RevoluteJointDef joint;
+	joint.Initialize(ground, b, b->GetPosition());
+	joint.enableLimit = true;
+	if (left)
+	{
+		joint.lowerAngle = -FLIPPER_SWING_ANGLE * DEGTORAD;
+		joint.upperAngle = 0.0f;
+	}
+	else
+	{
+		joint.lowerAngle = 0.0f;
+		joint.upperAngle = FLIPPER_SWING_ANGLE * DEGTORAD;
+	}
+	joint.enableMotor = true;
+	joint.maxMotorTorque = FLIPPER_MOTOR_TORQUE;
+	joint.motorSpeed = 0.0f;
 
-	pbody->body = p;
+	pbody->body = b;
+	pbody->joint = world->CreateJoint(&joint);
 
-	return pbody;
-
-}
-
-PhysBody* ModulePhysics::CreateEsquina() {
-	PhysBody* pbody = new PhysBody();
-	b2BodyDef pinballBody;
-	pinballBody.type = b2_staticBody;
-
-	//pinballBody.position.Set(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-	pinballBody.position.Set(PIXEL_TO_METER(GetScreenWidth() / 3), PIXEL_TO_METER(GetScreenHeight() / 10));
-
-	b2BodyDef esquinaBody;
-	esquinaBody.type = b2_staticBody;
-
-	esquinaBody.position.Set(pinballBody.position.x * 2 - PIXEL_TO_METER(125), pinballBody.position.y);
-
-	b2Body* eB = world->CreateBody(&esquinaBody);
-
-	b2Vec2 verticesEsquina[3];
-	verticesEsquina[0].Set(PIXEL_TO_METER(0.0f), PIXEL_TO_METER(0.0f));
-	verticesEsquina[1].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(0.0f));
-	verticesEsquina[2].Set(PIXEL_TO_METER(125.0f), PIXEL_TO_METER(125.0f));
-
-	b2PolygonShape esquinaShape;
-	esquinaShape.Set(verticesEsquina, 3);
-
-	b2FixtureDef esquinaFixture;
-	esquinaFixture.shape = &esquinaShape;
-	esquinaFixture.density = 1.0f;
-	esquinaFixture.friction = 0.0f;
-	esquinaFixture.restitution = 0.2f;
-	eB->CreateFixture(&esquinaFixture);
-
-	pbody->body = eB;
+	SetFlipperActive(pbody, false);
 
 	return pbody;
 }
 
-PhysBody* ModulePhysics::CreateLeftBumper()
+void ModulePhysics::SetFlipperActive(PhysBody* flipper, bool active)
+{
+	b2RevoluteJoint* joint = (b2RevoluteJoint*)flipper->joint;
+
+	// The left flipper goes up with negative speed, the right one with positive speed
+	float up_speed = (joint->GetLowerLimit() < 0.0f) ? -FLIPPER_MOTOR_SPEED : FLIPPER_MOTOR_SPEED;
+	joint->SetMotorSpeed(active ? up_speed : -up_speed);
+}
+
+PhysBody* ModulePhysics::CreateKicker(int x, int y, int half_width, int max_pull)
 {
 	PhysBody* pbody = new PhysBody();
 
-	b2BodyDef bumperBody;
-	bumperBody.type = b2_dynamicBody;
-	bumperBody.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
+	b2BodyDef body;
+	body.type = b2_dynamicBody;
+	body.position.Set(PIXEL_TO_METER(x), PIXEL_TO_METER(y));
+	body.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
 
-	bumperBody.position.Set(PIXEL_TO_METER(525), PIXEL_TO_METER(550));
+	b2Body* b = world->CreateBody(&body);
 
-	b2Body* bumper = world->CreateBody(&bumperBody);
+	b2PolygonShape box;
+	box.SetAsBox(PIXEL_TO_METER(half_width), PIXEL_TO_METER(8));
 
-	b2Vec2 verticesBumper[3];
-	verticesBumper[0].Set(PIXEL_TO_METER(-6.25f), PIXEL_TO_METER(10.825f));
-	verticesBumper[1].Set(PIXEL_TO_METER(6.25f), PIXEL_TO_METER(-10.825f));
-	verticesBumper[2].Set(PIXEL_TO_METER(64.952f), PIXEL_TO_METER(37.5f));
+	b2FixtureDef fixture;
+	fixture.shape = &box;
+	fixture.density = 2.0f;
+	fixture.friction = 0.5f;
+	fixture.restitution = 0.0f;
+	b->CreateFixture(&fixture);
 
-	b2PolygonShape bumperShape;
-	bumperShape.Set(verticesBumper, 3);
+	// Prismatic joint along +Y (down): translation 0 = rest, max_pull = fully pulled
+	b2PrismaticJointDef joint;
+	joint.Initialize(ground, b, b->GetPosition(), b2Vec2(0.0f, 1.0f));
+	joint.enableLimit = true;
+	joint.lowerTranslation = 0.0f;
+	joint.upperTranslation = PIXEL_TO_METER(max_pull);
+	joint.enableMotor = true;
+	joint.maxMotorForce = KICKER_MOTOR_FORCE;
+	joint.motorSpeed = -KICKER_PULL_SPEED;
 
-	b2FixtureDef bumperFixture;
-	bumperFixture.shape = &bumperShape;
-	bumperFixture.density = 1.0f;
-	bumperFixture.friction = 0.0f;
-	bumperFixture.restitution = 1.0f;
-	bumper->CreateFixture(&bumperFixture);
-
-	b2BodyDef anchorDef1;
-	anchorDef1.type = b2_staticBody;
-
-	anchorDef1.position.Set(bumperBody.position.x, bumperBody.position.y);
-
-	b2Body* anchor1 = world->CreateBody(&anchorDef1);
-
-	b2CircleShape anchorShape;
-	anchorShape.m_radius = PIXEL_TO_METER(1.0f);
-
-	b2FixtureDef anchorFixture;
-	anchorFixture.shape = &anchorShape;
-	anchorFixture.density = 0.0f;
-	anchorFixture.restitution = 0.0f;
-	anchor1->CreateFixture(&anchorFixture);
-
-	b2RevoluteJointDef revoluteJointBumper;
-	revoluteJointBumper.Initialize(anchor1, bumper, anchor1->GetWorldCenter());
-
-	revoluteJointBumper.enableLimit = true;
-	revoluteJointBumper.lowerAngle = -60 * b2_pi / 180;
-	revoluteJointBumper.upperAngle = 0 * b2_pi / 180;
-
-	revoluteJointBumper.enableMotor = true;
-	revoluteJointBumper.maxMotorTorque = 1000.0f;
-	revoluteJointBumper.motorSpeed = 0.0f;
-
-	bumperJoint1 = (b2RevoluteJoint*)world->CreateJoint(&revoluteJointBumper);
-
-
-	pbody->body = bumper;
+	pbody->body = b;
+	pbody->joint = world->CreateJoint(&joint);
 
 	return pbody;
 }
-PhysBody* ModulePhysics::CreateRightBumper()
+
+void ModulePhysics::PullKicker(PhysBody* kicker)
 {
-	PhysBody* pbody = new PhysBody();
-
-	b2BodyDef bumperBody2;
-	bumperBody2.type = b2_dynamicBody;
-	bumperBody2.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
-
-	bumperBody2.position.Set(PIXEL_TO_METER(750), PIXEL_TO_METER(550));
-
-	b2Body* bumper2 = world->CreateBody(&bumperBody2);
-
-	b2Vec2 verticesBumper2[3];
-	verticesBumper2[0].Set(PIXEL_TO_METER(6.25f), PIXEL_TO_METER(10.825f));
-	verticesBumper2[1].Set(PIXEL_TO_METER(-6.25f), PIXEL_TO_METER(-10.825f));
-	verticesBumper2[2].Set(PIXEL_TO_METER(-64.952f), PIXEL_TO_METER(37.5f));
-
-	b2PolygonShape bumperShape2;
-	bumperShape2.Set(verticesBumper2, 3);
-
-	b2FixtureDef bumperFixture2;
-	bumperFixture2.shape = &bumperShape2;
-	bumperFixture2.density = 1.0f;
-	bumperFixture2.friction = 0.0f;
-	bumperFixture2.restitution = 1.0f;
-	bumper2->CreateFixture(&bumperFixture2);
-
-	b2BodyDef anchorDef2;
-	anchorDef2.type = b2_staticBody;
-	anchorDef2.position.Set(bumperBody2.position.x, bumperBody2.position.y);
-	b2Body* anchor2 = world->CreateBody(&anchorDef2);
-
-	b2CircleShape anchorShape2;
-	anchorShape2.m_radius = PIXEL_TO_METER(1.0f);
-
-	b2FixtureDef anchorFixture2;
-	anchorFixture2.shape = &anchorShape2;
-	anchorFixture2.density = 0.0f;
-	anchorFixture2.restitution = 0.0f;
-	anchor2->CreateFixture(&anchorFixture2);
-
-	b2RevoluteJointDef revoluteJointBumper2;
-	revoluteJointBumper2.Initialize(anchor2, bumper2, anchor2->GetWorldCenter());
-	revoluteJointBumper2.enableLimit = true;
-	revoluteJointBumper2.lowerAngle = 0 * b2_pi / 180;     // mirrored: 0 to +60
-	revoluteJointBumper2.upperAngle = 60 * b2_pi / 180;
-	revoluteJointBumper2.enableMotor = true;
-	revoluteJointBumper2.maxMotorTorque = 1000.0f;
-	revoluteJointBumper2.motorSpeed = 0.0f;
-
-	bumperJoint2 = (b2RevoluteJoint*)world->CreateJoint(&revoluteJointBumper2);
-
-	pbody->body = bumper2;
-
-	return pbody;
+	((b2PrismaticJoint*)kicker->joint)->SetMotorSpeed(KICKER_PULL_SPEED);
 }
 
-PhysBody* ModulePhysics::CreateShooter()
+void ModulePhysics::ReleaseKicker(PhysBody* kicker)
 {
-	PhysBody* pbody = new PhysBody();
-
-	b2BodyDef anchorShooterSpringDef;
-	anchorShooterSpringDef.type = b2_staticBody;
-
-	anchorShooterSpringDef.position.Set(PIXEL_TO_METER(GetScreenWidth() / 3) * 2 - PIXEL_TO_METER(30), PIXEL_TO_METER(GetScreenHeight() / 10) + PIXEL_TO_METER(GetScreenHeight() / 1.2) - PIXEL_TO_METER(10.0f));
-	b2Body* anchorShooterSpring = world->CreateBody(&anchorShooterSpringDef);
-
-	b2CircleShape anchorShooterSpringShape;
-	anchorShooterSpringShape.m_radius = PIXEL_TO_METER(1.0f);
-
-	b2FixtureDef anchorShooterSpringFixture;
-	anchorShooterSpringFixture.shape = &anchorShooterSpringShape;
-	anchorShooterSpringFixture.density = 0.0f;
-	anchorShooterSpringFixture.restitution = 0.0f;
-	anchorShooterSpring->CreateFixture(&anchorShooterSpringFixture);
-
-
-	b2BodyDef shooterSpringDef;
-	shooterSpringDef.type = b2_dynamicBody;
-	shooterSpringDef.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
-
-	shooterSpringDef.position.Set(anchorShooterSpring->GetPosition().x, PIXEL_TO_METER(GetScreenHeight() / 10) + PIXEL_TO_METER(GetScreenHeight() / 1.2) - PIXEL_TO_METER(100.0f));
-
-	b2Body* shooterSpring = world->CreateBody(&shooterSpringDef);
-
-	b2PolygonShape shooterSpringShape;
-	shooterSpringShape.SetAsBox(PIXEL_TO_METER(30.0f), PIXEL_TO_METER(7.5f));
-
-	b2FixtureDef shooterSpringFixture;
-	shooterSpringFixture.shape = &shooterSpringShape;
-	shooterSpringFixture.density = 1.0f;
-	shooterSpringFixture.friction = 0.0f;
-	shooterSpringFixture.restitution = 1.0f;
-	shooterSpring->CreateFixture(&shooterSpringFixture);
-
-
-	b2PrismaticJointDef shooterSpringJointDef;
-	b2Vec2 worldAxis(0.0f, 1.0f);
-	shooterSpringJointDef.Initialize(anchorShooterSpring, shooterSpring, anchorShooterSpring->GetWorldCenter(), worldAxis);
-	shooterSpringJointDef.lowerTranslation = PIXEL_TO_METER(-20.0f);
-	shooterSpringJointDef.upperTranslation = PIXEL_TO_METER(50.0f);
-	shooterSpringJointDef.enableLimit = true;
-	shooterSpringJointDef.maxMotorForce = 500.0f;
-	shooterSpringJointDef.motorSpeed = 0.0f;
-	shooterSpringJointDef.enableMotor = true;
-
-	shooterSpringJoint = (b2PrismaticJoint*)world->CreateJoint(&shooterSpringJointDef);
-
-	pbody->body = shooterSpring;
-
-	return pbody;
+	// The further it was pulled, the harder it hits
+	((b2PrismaticJoint*)kicker->joint)->SetMotorSpeed(-KICKER_LAUNCH_SPEED * GetKickerPull(kicker));
 }
 
+float ModulePhysics::GetKickerPull(const PhysBody* kicker) const
+{
+	b2PrismaticJoint* joint = (b2PrismaticJoint*)kicker->joint;
+	float pull = joint->GetJointTranslation() / joint->GetUpperLimit();
+	return (pull < 0.0f) ? 0.0f : (pull > 1.0f) ? 1.0f : pull;
+}
 
+void ModulePhysics::SetGravity(float gravity_y)
+{
+	world->SetGravity(b2Vec2(GRAVITY_X, gravity_y));
+
+	// Sleeping bodies would ignore the change until something touches them
+	for (b2Body* b = world->GetBodyList(); b; b = b->GetNext())
+	{
+		if (b->GetType() == b2_dynamicBody)
+			b->SetAwake(true);
+	}
+}
+
+float ModulePhysics::GetGravity() const
+{
+	return world->GetGravity().y;
+}
 
 void ModulePhysics::DestroyBody(PhysBody* pbody)
 {
 	if (pbody == NULL)
 		return;
 
-	// Drop any pending teleport of this body (avoids a dangling pointer)
-	teleports.erase(
-		std::remove_if(teleports.begin(), teleports.end(),
-			[pbody](const TeleportRequest& t) { return t.body == pbody; }),
-		teleports.end());
+	// The mouse joint would be destroyed with the body: forget it first
+	if (mouse_joint != NULL && mouse_joint->GetBodyB() == pbody->body)
+		mouse_joint = NULL;
 
-	world->DestroyBody(pbody->body); // Box2D frees the body and its fixtures
+	world->DestroyBody(pbody->body); // Box2D frees the body, its fixtures and its joints
 	delete pbody;                    // we free our own wrapper
 }
-
-//void ModulePhysics::InstantiatePinball(b2World &world)
-//{
-//	outerWall = CreatePinballOuterWall(&world);
-//	leftBumper = CreatePinballLeftBumper(&world);
-//	rightBumper = CreatePinballRightBumper(&world);
-//	shooter = CreatePinballShooter(&world);
-//	esquina = CreatePinballEsquina(&world);
-//
-//	// Añadir portal
-//}
 
 void ModulePhysics::BeginContact(b2Contact* contact)
 {
 	PhysBody* a = (PhysBody*)contact->GetFixtureA()->GetBody()->GetUserData().pointer;
 	PhysBody* b = (PhysBody*)contact->GetFixtureB()->GetBody()->GetUserData().pointer;
 
-	// Portal: only queue the teleport, the world is locked during Step
-	PhysBody* ball = NULL;
-	if (a != NULL && a == portalIn) ball = b;
-	else if (b != NULL && b == portalIn) ball = a;
-
-	if (ball != NULL)
-	{
-		bool queued = false;
-		for (const TeleportRequest& t : teleports)
-		{
-			if (t.body == ball) { queued = true; break; }
-		}
-
-		if (!queued)
-			teleports.push_back({ ball, portalOut });
-	}
-
 	if (a != NULL && a->listener != NULL)
 		a->listener->OnCollision(a, b);
 
 	if (b != NULL && b->listener != NULL)
 		b->listener->OnCollision(b, a);
+}
+
+// PhysBody ------------------------------------
+void PhysBody::GetPosition(int& x, int& y) const
+{
+	b2Vec2 pos = body->GetPosition();
+	x = METER_TO_PIXEL(pos.x);
+	y = METER_TO_PIXEL(pos.y);
+}
+
+float PhysBody::GetRotation() const
+{
+	return body->GetAngle();
+}
+
+void PhysBody::SetPosition(int x, int y)
+{
+	body->SetTransform(b2Vec2(PIXEL_TO_METER(x), PIXEL_TO_METER(y)), body->GetAngle());
+	body->SetAwake(true);
+}
+
+void PhysBody::SetLinearVelocity(float vx, float vy)
+{
+	body->SetLinearVelocity(b2Vec2(vx, vy));
+	body->SetAngularVelocity(0.0f);
+	body->SetAwake(true);
+}
+
+void PhysBody::SetGravityScale(float scale)
+{
+	body->SetGravityScale(scale);
+}
+
+void PhysBody::SetRestitution(float restitution)
+{
+	for (b2Fixture* fixture = body->GetFixtureList(); fixture; fixture = fixture->GetNext())
+		fixture->SetRestitution(restitution);
+}
+
+void PhysBody::SetFriction(float friction)
+{
+	for (b2Fixture* fixture = body->GetFixtureList(); fixture; fixture = fixture->GetNext())
+		fixture->SetFriction(friction);
+}
+
+bool PhysBody::Contains(int x, int y) const
+{
+	b2Vec2 p(PIXEL_TO_METER(x), PIXEL_TO_METER(y));
+
+	// True if the point is inside ANY of the shapes of this body
+	for (b2Fixture* fixture = body->GetFixtureList(); fixture; fixture = fixture->GetNext())
+	{
+		if (fixture->GetShape()->TestPoint(body->GetTransform(), p))
+			return true;
+	}
+
+	return false;
+}
+
+int PhysBody::RayCast(int x1, int y1, int x2, int y2, float& normal_x, float& normal_y) const
+{
+	// No hit: return -1
+	// Hit: fill normal_x and normal_y and return the distance between x1,y1 and the hit point
+	int ret = -1;
+
+	b2RayCastInput input;
+	input.p1.Set(PIXEL_TO_METER(x1), PIXEL_TO_METER(y1));
+	input.p2.Set(PIXEL_TO_METER(x2), PIXEL_TO_METER(y2));
+	input.maxFraction = 1.0f;
+
+	float closest = 1.0f;
+
+	for (b2Fixture* fixture = body->GetFixtureList(); fixture; fixture = fixture->GetNext())
+	{
+		// A chain has one child per edge
+		for (int32 i = 0; i < fixture->GetShape()->GetChildCount(); ++i)
+		{
+			b2RayCastOutput output;
+			if (fixture->GetShape()->RayCast(&output, input, body->GetTransform(), i) && output.fraction <= closest)
+			{
+				closest = output.fraction;
+
+				float dx = (float)(x2 - x1);
+				float dy = (float)(y2 - y1);
+				ret = (int)(output.fraction * sqrtf(dx * dx + dy * dy));
+
+				normal_x = output.normal.x;
+				normal_y = output.normal.y;
+			}
+		}
+	}
+
+	return ret;
 }
