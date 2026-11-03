@@ -4,8 +4,6 @@
 
 #include "raylib.h"
 
-#define MAX_FX_SOUNDS   64
-
 ModuleAudio::ModuleAudio(Application* app, bool start_enabled) : Module(app, start_enabled)
 {
 	fx_count = 0;
@@ -70,13 +68,19 @@ bool ModuleAudio::PlayMusic(const char* path, float fade_time)
 	return ret;
 }
 
-// Load WAV
+// Load WAV. Returns 0 on failure, otherwise the fx id to use with PlayFx (1-based)
 unsigned int ModuleAudio::LoadFx(const char* path)
 {
 	if(IsEnabled() == false)
 		return 0;
 
 	unsigned int ret = 0;
+
+	if (fx_count >= MAX_SOUNDS)
+	{
+		LOG("Cannot load sound %s: max sounds (%d) reached", path, MAX_SOUNDS);
+		return 0;
+	}
 
 	Sound sound = LoadSound(path);
 
@@ -103,7 +107,12 @@ bool ModuleAudio::PlayFx(unsigned int id, int repeat)
 
 	bool ret = false;
 
-	if(id < fx_count) PlaySound(fx[id]);
+	// Ids are 1-based (0 means "not loaded")
+	if (id > 0 && id <= fx_count)
+	{
+		PlaySound(fx[id - 1]);
+		ret = true;
+	}
 
 	return ret;
 }

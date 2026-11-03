@@ -37,9 +37,14 @@ public:
     // Gather relevant win events
     bool GetWindowEvent(WindowEvent ev);
 
+	// Rendering frame rate. Physics speed does not depend on it
+	void SetTargetFps(int fps);
+	int GetTargetFps() const;
+
 private:
 	uint width;
 	uint height;
+	int target_fps;
 
     bool windowEvents[WINDOW_EVENT_COUNT];
 };

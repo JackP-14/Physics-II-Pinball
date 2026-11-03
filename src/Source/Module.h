@@ -75,4 +75,9 @@ public:
 	virtual void OnCollision(PhysBody* bodyA, PhysBody* bodyB)
 	{
 	}
+
+	// Called when two bodies stop touching (e.g. a ball leaving a sensor)
+	virtual void OnCollisionEnd(PhysBody* bodyA, PhysBody* bodyB)
+	{
+	}
 };

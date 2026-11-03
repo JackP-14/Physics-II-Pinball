@@ -4,6 +4,12 @@
 
 ModuleWindow::ModuleWindow(Application* app, bool start_enabled) : Module(app, start_enabled)
 {
+	width = SCREEN_WIDTH;
+	height = SCREEN_HEIGHT;
+	target_fps = DEFAULT_TARGET_FPS;
+
+	for (int i = 0; i < WINDOW_EVENT_COUNT; ++i)
+		windowEvents[i] = false;
 }
 
 // Destructor
@@ -38,6 +44,7 @@ bool ModuleWindow::Init()
 
     SetConfigFlags(flags);
 	InitWindow(width, height, TITLE);
+	SetTargetFps(target_fps);
 
 	return ret;
 }
@@ -91,4 +98,15 @@ uint ModuleWindow::GetHeight() const
 bool ModuleWindow::GetWindowEvent(WindowEvent ev)
 {
     return windowEvents[ev];
+}
+
+void ModuleWindow::SetTargetFps(int fps)
+{
+	target_fps = fps;
+	SetTargetFPS(fps);
+}
+
+int ModuleWindow::GetTargetFps() const
+{
+	return target_fps;
 }
