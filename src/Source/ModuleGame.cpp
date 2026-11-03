@@ -44,6 +44,16 @@
 #define SINKHOLE_EJECT_VX 5.0f    // m/s, towards the center of the table
 #define SINKHOLE_EJECT_VY 1.0f
 
+#define CAULDRON_X 493
+#define CAULDRON_Y 298
+#define CAULDRON_HALF_W 30
+#define CAULDRON_HALF_H 20
+#define CAULDRON_HOLD_TIME 1.0f
+#define CAULDRON_COOLDOWN 1.0f
+#define CAULDRON_EJECT_VX -4.0f	// m/s, towards the center of the table
+#define CAULDRON_EJECT_VY 4.0f	// downwards, away from the candy bank
+#define CAULDRON_POINTS 300
+
 #define FLASH_TIME 0.15f
 #define MESSAGE_TIME 2.0f
 
@@ -137,7 +147,18 @@ static const int ramp_inner_lower[] = {
 };
 
 // Left edge of the table, so the ball that goes under the ramp stays on the table
-static const int left_outlane_wall[] = { 44, 420, 44, 690 };
+// Left edge of the table: down the outlane and along the bottom V until the drain gap
+static const int left_outlane_wall[] = {
+	44, 420,
+	44, 690,
+	272, 823
+};
+
+// Bottom V, right side: from the kicker lane down to the drain gap
+static const int bottom_right_wall[] = {
+	560, 696,
+	380, 823
+};
 
 // Floor under the exit: the top edge of the painted left bar, it feeds the ball into the left inlane
 static const int left_inlane_floor[] = {
@@ -170,18 +191,6 @@ static const int pumpkin[] = {
 	350, 196,
 	240, 196,
 	226, 172
-};
-
-static const int cauldron[] = {
-	440, 282,
-	458, 262,
-	500, 256,
-	540, 262,
-	546, 285,
-	535, 322,
-	500, 342,
-	462, 332,
-	445, 310
 };
 
 static const int candy_bank[] = {
@@ -418,12 +427,16 @@ ModuleGame::ModuleGame(Application* app, bool start_enabled) : Module(app, start
 
 	drain = NULL;
 	sinkhole = NULL;
+	cauldron = NULL;
 	left_flipper = NULL;
 	right_flipper = NULL;
 	kicker = NULL;
 	ball = NULL;
 	ball_lost = false;
 	sinkhole_entered = false;
+	cauldron_entered = false;
+	cauldron_timer = 0.0f; 
+	cauldron_cooldown = 0.0f;
 	sinkhole_timer = 0.0f;
 	sinkhole_cooldown = 0.0f;
 
@@ -572,6 +585,7 @@ void ModuleGame::CreateTable()
 	walls.push_back(lower);
 
 	walls.push_back(CreateTableWall(left_outlane_wall, ARRAY_COUNT(left_outlane_wall), 0.1f));
+	walls.push_back(CreateTableWall(bottom_right_wall, ARRAY_COUNT(bottom_right_wall), 0.1f));
 
 	walls.push_back(CreateTableWall(left_inlane_floor, ARRAY_COUNT(left_inlane_floor), 0.1f));
 	walls.push_back(CreateTableChain(right_wall, ARRAY_COUNT(right_wall), false));
@@ -581,7 +595,6 @@ void ModuleGame::CreateTable()
 
 	// Solid obstacles
 	walls.push_back(CreateTableChain(pumpkin, ARRAY_COUNT(pumpkin), true));
-	walls.push_back(CreateTableChain(cauldron, ARRAY_COUNT(cauldron), true));
 	walls.push_back(CreateTableChain(candy_bank, ARRAY_COUNT(candy_bank), true));
 
 	// Bouncy elements: they give points
@@ -614,6 +627,10 @@ void ModuleGame::CreateTable()
 	sinkhole = App->physics->CreateRectangleSensor(TableX(SINKHOLE_X), TableY(SINKHOLE_Y),
 		TableLength(SINKHOLE_HALF_SIZE), TableLength(SINKHOLE_HALF_SIZE));
 	sinkhole->listener = this;
+
+	cauldron = App->physics->CreateRectangleSensor(TableX(CAULDRON_X), TableY(CAULDRON_Y),
+		TableLength(CAULDRON_HALF_W), TableLength(CAULDRON_HALF_H));
+	cauldron->listener = this;
 
 	left_flipper = new Flipper(App->physics, TableX(LEFT_FLIPPER_X), TableY(FLIPPERS_Y), TableLength(FLIPPER_LENGTH), true, flipper_tex);
 	right_flipper = new Flipper(App->physics, TableX(RIGHT_FLIPPER_X), TableY(FLIPPERS_Y), TableLength(FLIPPER_LENGTH), false, flipper_tex);
@@ -653,6 +670,9 @@ void ModuleGame::DestroyTable()
 
 	App->physics->DestroyBody(sinkhole);
 	sinkhole = NULL;
+
+	App->physics->DestroyBody(cauldron); 
+	cauldron = NULL;
 
 	App->physics->DestroyBody(drain);
 	drain = NULL;
@@ -732,6 +752,10 @@ void ModuleGame::DestroyBall()
 	sinkhole_cooldown = 0.0f;
 
 	ball_on_ramp = false;
+
+	cauldron_entered = false;
+	cauldron_timer = 0.0f; 
+	cauldron_cooldown = 0.0f;
 }
 
 void ModuleGame::AddScore(int points)
@@ -904,6 +928,7 @@ void ModuleGame::UpdatePlaying(float dt)
 	else if (ball != NULL)
 	{
 		UpdateSinkhole(dt);
+		UpdateCauldron(dt);
 		UpdateBallLayer();
 	}
 }
@@ -994,6 +1019,12 @@ void ModuleGame::OnCollision(PhysBody* bodyA, PhysBody* bodyB)
 	if (bodyA == sinkhole)
 	{
 		sinkhole_entered = true;
+		return;
+	}
+
+	if (bodyA == cauldron)
+	{
+		cauldron_entered = true;
 		return;
 	}
 
@@ -1212,5 +1243,41 @@ void ModuleGame::UpdateBallLayer()
 		float outside = 80.0f * (tx - 197.0f) + 60.0f * (ty - 205.0f);
 		if ((tx > 140.0f && ty < 330.0f && outside > 2000.0f) || ty > 612.0f)
 			SetBallOnRamp(false);
+	}
+}
+
+void ModuleGame::UpdateCauldron(float dt)
+{
+	if (cauldron_cooldown > 0.0f)
+		cauldron_cooldown -= dt;
+
+	// Capture here and not in the callback: moving bodies during Step is not allowed
+	if (cauldron_entered)
+	{
+		cauldron_entered = false;
+
+		if (cauldron_timer <= 0.0f && cauldron_cooldown <= 0.0f)
+		{
+			cauldron_timer = CAULDRON_HOLD_TIME;
+			ball->body->SetGravityScale(0.0f);
+			AddScore(CAULDRON_POINTS);
+			App->audio->PlayFx(fx_hole);
+			ShowMessage("CAULDRON +300");
+		}
+	}
+
+	if (cauldron_timer > 0.0f)
+	{
+		ball->body->SetPosition(TableX(CAULDRON_X), TableY(CAULDRON_Y));
+		ball->body->SetLinearVelocity(0.0f, 0.0f);
+
+		cauldron_timer -= dt;
+		if (cauldron_timer <= 0.0f)
+		{
+			ball->body->SetGravityScale(1.0f);
+			ball->body->SetLinearVelocity(CAULDRON_EJECT_VX, CAULDRON_EJECT_VY);
+			cauldron_cooldown = CAULDRON_COOLDOWN;
+			App->audio->PlayFx(fx_kicker);
+		}
 	}
 }

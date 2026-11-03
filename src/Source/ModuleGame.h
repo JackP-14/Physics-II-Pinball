@@ -75,6 +75,12 @@ private:
 	void UpdateSinkhole(float dt);
 	void UpdateEffects(float dt);
 
+	PhysBody* cauldron;
+	bool cauldron_entered;
+	float cauldron_timer;
+	float cauldron_cooldown;
+	void UpdateCauldron(float dt);
+
 	// Returns true when the hit completed the bank
 	bool HitTarget(TargetBank& bank, int index, int points);
 	void ShowMessage(const char* text);
