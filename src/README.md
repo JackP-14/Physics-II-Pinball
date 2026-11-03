@@ -25,6 +25,8 @@ A recreation of a Pinball game built with Raylib for rendering and Box2D for han
 
 ## Differences with the Original
 
+We removed the corridor from the pumpkin to the lane.
+
 ## Slopsquad Team Members:
 
 Marcel Ribot Llorens: https://github.com/JackP-14  
