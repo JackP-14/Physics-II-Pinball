@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Physics II Halloween Pinball by SlopSquad Team
 
 ## Original Game Link
@@ -61,22 +60,8 @@ Pinball made for Physics II (Project 01: Classic Physics) with **Box2D v2.4.1** 
 | F8 / F9 | Ball friction - / + |
 | F11 | Reset physics settings |
 
-## Differences with the original
-
-See the list in [README.txt](../README.txt), which is also included in the release zip.
-
-## Building a release
-
-```
-powershell -ExecutionPolicy Bypass -File tools/make_release.ps1 -ZipName Lastname1Name1_Lastname2Name2
-```
-
-It builds Release|Win32 (static CRT, no extra DLLs needed) and creates `src/Build/Package/<ZipName>.zip` with the executable, the assets it uses and `README.txt`.
->>>>>>> Claudio
-
 ## Differences with the Original
 
-<<<<<<< HEAD
 We removed the corridor from the pumpkin to the lane.
 
 ## Slopsquad Team Members:
@@ -85,17 +70,8 @@ Marcel Ribot Llorens: https://github.com/JackP-14
 Lux Duart Pérez: https://github.com/Ballo0x  
 Daniel Martínez Martínez: https://github.com/Dunge0nraider  
 Nil Fernández Muniente: https://github.com/xdHyfa  
-=======
- - TODO Name Lastname - Role(s)
- - TODO Name Lastname - Role(s)
- - TODO Name Lastname - Role(s)
- - TODO Name Lastname - Role(s)
->>>>>>> Claudio
 
 ## License
 
 This project is licensed under an unmodified MIT license, which is an OSI-certified license that allows static linking with closed source software. Check [LICENSE](LICENSE) for further details.
-<<<<<<< HEAD
 
-=======
->>>>>>> Claudio
