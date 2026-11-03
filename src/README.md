@@ -1,4 +1,4 @@
-# {Physics II Pinball, By SlopSquad Team}
+# Physics II Halloween Pinball by SlopSquad Team
 
 ## Original Game Link
 
