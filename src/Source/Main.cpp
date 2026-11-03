@@ -5,9 +5,7 @@
 
 #include <stdlib.h>
 
-#ifdef _DEBUG
 #include <crtdbg.h>
-#endif
 
 enum main_states
 {
@@ -20,11 +18,6 @@ enum main_states
 
 int main(int argc, char ** argv)
 {
-#ifdef _DEBUG
-	// Report any memory leak in the Output window when the program exits
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-#endif
-
 	LOG("Starting game '%s'...", TITLE);
 
 	int main_return = EXIT_FAILURE;

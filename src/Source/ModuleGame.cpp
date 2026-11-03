@@ -78,22 +78,7 @@ static const int outer_wall[] = {
 	180, 30,
 	168, 75,
 	176, 135,
-	198, 205,	// left ramp
-	138, 285,
-	145, 292,	// left candy targets
-	123, 362,
-	137, 372,	// tombstone
-	137, 412,
-	120, 418,
-	105, 432,	// left ramp
-	105, 480,
-	112, 520,
-	130, 542,
-	158, 562,
-	175, 578,
-	177, 640,	// behind the left slingshot
-	177, 694,	// left inlane
-	220, 722
+	198, 205	// top corner of the ramp mouth
 };
 
 // Right side of the playfield: right inlane, end of the right ramp, bat, rail behind the cauldron
@@ -119,6 +104,67 @@ static const int right_wall[] = {
 	505, 125,
 	512, 112,
 	548, 80
+};
+
+// Back of the left slingshot: two-sided, so the ball can't get inside the slingshot from the ramp exit
+static const int sling_back_wall[] = {
+	175, 578,
+	177, 640
+};
+
+// Guide into the left flipper (one-sided, the ball rolls on top of it)
+static const int left_inlane_guide[] = {
+	177, 694,
+	220, 722
+};
+
+// Left ramp, outer edge: exit ring -> left lane -> hairpin -> right strip -> mouth top corner
+static const int ramp_outer[] = {
+	138, 604,	// exit: open gap between here and (175, 578)
+	115, 597,
+	92, 578,
+	72, 548,
+	60, 515,
+	58, 480,
+	58, 60,
+	66, 42,
+	78, 30,
+	95, 25,
+	112, 23,
+	130, 26,
+	145, 34,
+	157, 50,
+	165, 75,
+	176, 135,
+	198, 205
+};
+
+// Left ramp, inner edge: closes the slit between the two lanes and follows the candy cards and the tombstone
+static const int ramp_inner[] = {
+	175, 578,
+	158, 562,
+	130, 542,
+	112, 520,
+	105, 480,
+	105, 432,
+	105, 70,	// left lane, right wall
+	107, 63,	// top of the divider
+	112, 60,
+	117, 62,
+	120, 68,
+	137, 285,	// right strip, left wall, down to the mouth
+	145, 292,	// left candy cards
+	123, 362,
+	137, 372,	// tombstone
+	137, 412,
+	120, 418,
+	105, 432
+};
+
+// Floor under the exit: the top edge of the painted left bar, it feeds the ball into the left inlane
+static const int left_inlane_floor[] = {
+	88, 628,
+	177, 694
 };
 
 // Inner edge of the launch ramp and left wall of the kicker lane: the ball touches it from both sides
@@ -534,6 +580,11 @@ void ModuleGame::CreateTable()
 {
 	// Walls
 	walls.push_back(CreateTableChain(outer_wall, ARRAY_COUNT(outer_wall), false));
+	walls.push_back(CreateTableWall(sling_back_wall, ARRAY_COUNT(sling_back_wall), 0.1f));
+	walls.push_back(CreateTableChain(left_inlane_guide, ARRAY_COUNT(left_inlane_guide), false));
+	walls.push_back(CreateTableWall(ramp_outer, ARRAY_COUNT(ramp_outer), 0.1f));
+	walls.push_back(CreateTableWall(ramp_inner, ARRAY_COUNT(ramp_inner), 0.1f));
+	walls.push_back(CreateTableWall(left_inlane_floor, ARRAY_COUNT(left_inlane_floor), 0.1f));
 	walls.push_back(CreateTableChain(right_wall, ARRAY_COUNT(right_wall), false));
 	walls.push_back(CreateTableWall(launch_wall, ARRAY_COUNT(launch_wall)));
 	walls.push_back(CreateTableWall(left_sling_bottom, ARRAY_COUNT(left_sling_bottom)));
