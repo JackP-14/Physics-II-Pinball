@@ -19,6 +19,9 @@
 
 // The simulation always advances in steps of this size, whatever the render FPS is
 #define PHYSICS_TIMESTEP (1.0f / 60.0f)
+#define LAYER_GROUND 0x0001	// default: everything that already exists
+#define LAYER_RAMP   0x0002	// walls that only a ball riding the ramp collides with
+
 // Max real time simulated in one frame: avoids the "spiral of death" when a frame takes too long
 #define PHYSICS_MAX_FRAME_TIME 0.25f
 
@@ -42,6 +45,9 @@ public:
 	// Applied to every fixture of the body. Existing contacts keep the old value until they end
 	void SetRestitution(float restitution);
 	void SetFriction(float friction);
+
+	// Two bodies collide only if each mask contains the other's category
+	void SetCollisionFilter(unsigned short category, unsigned short mask);
 
 public:
 	b2Body* body;

@@ -626,6 +626,17 @@ void PhysBody::SetFriction(float friction)
 		fixture->SetFriction(friction);
 }
 
+void PhysBody::SetCollisionFilter(unsigned short category, unsigned short mask)
+{
+	for (b2Fixture* fixture = body->GetFixtureList(); fixture; fixture = fixture->GetNext())
+	{
+		b2Filter filter = fixture->GetFilterData();
+		filter.categoryBits = category;
+		filter.maskBits = mask;
+		fixture->SetFilterData(filter);
+	}
+}
+
 bool PhysBody::Contains(int x, int y) const
 {
 	b2Vec2 p(PIXEL_TO_METER(x), PIXEL_TO_METER(y));

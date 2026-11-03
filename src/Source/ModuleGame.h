@@ -82,6 +82,10 @@ private:
 	void DrawLights() const;
 	void DrawHud() const;
 
+	bool ball_on_ramp;
+	void SetBallOnRamp(bool on);
+	void UpdateBallLayer();
+
 private:
 	GameState state;
 	float state_timer;

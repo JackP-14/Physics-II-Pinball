@@ -118,48 +118,26 @@ static const int left_inlane_guide[] = {
 	220, 722
 };
 
-// Left ramp, outer edge: exit ring -> left lane -> hairpin -> right strip -> mouth top corner
-static const int ramp_outer[] = {
-	138, 604,	// exit: open gap between here and (175, 578)
-	115, 597,
-	92, 578,
-	72, 548,
-	60, 515,
-	58, 480,
-	58, 60,
-	66, 42,
-	78, 30,
-	95, 25,
-	112, 23,
-	130, 26,
-	145, 34,
-	157, 50,
-	165, 75,
-	176, 135,
-	198, 205
+// Ramp walls the ball touches from the table (both layers)
+static const int ramp_outer_upper[] = {
+	58, 420, 58, 60, 66, 42, 78, 30, 95, 25, 112, 23, 130, 26,
+	145, 34, 157, 50, 165, 75, 176, 135, 198, 205
+};
+static const int ramp_inner_upper[] = {
+	105, 432, 105, 70, 107, 63, 112, 60, 117, 62, 120, 68,
+	137, 285, 145, 292, 123, 362, 137, 372, 137, 412, 120, 418, 105, 432
 };
 
-// Left ramp, inner edge: closes the slit between the two lanes and follows the candy cards and the tombstone
-static const int ramp_inner[] = {
-	175, 578,
-	158, 562,
-	130, 542,
-	112, 520,
-	105, 480,
-	105, 432,
-	105, 70,	// left lane, right wall
-	107, 63,	// top of the divider
-	112, 60,
-	117, 62,
-	120, 68,
-	137, 285,	// right strip, left wall, down to the mouth
-	145, 292,	// left candy cards
-	123, 362,
-	137, 372,	// tombstone
-	137, 412,
-	120, 418,
-	105, 432
+// Lower part of the ramp: only a ball riding the ramp collides with it, a ball on the table passes under
+static const int ramp_outer_lower[] = {
+	138, 604, 115, 597, 92, 578, 72, 548, 60, 515, 58, 480, 58, 420
 };
+static const int ramp_inner_lower[] = {
+	175, 578, 158, 562, 130, 542, 112, 520, 105, 480, 105, 432
+};
+
+// Left edge of the table, so the ball that goes under the ramp stays on the table
+static const int left_outlane_wall[] = { 44, 420, 44, 690 };
 
 // Floor under the exit: the top edge of the painted left bar, it feeds the ball into the left inlane
 static const int left_inlane_floor[] = {
@@ -582,8 +560,19 @@ void ModuleGame::CreateTable()
 	walls.push_back(CreateTableChain(outer_wall, ARRAY_COUNT(outer_wall), false));
 	walls.push_back(CreateTableWall(sling_back_wall, ARRAY_COUNT(sling_back_wall), 0.1f));
 	walls.push_back(CreateTableChain(left_inlane_guide, ARRAY_COUNT(left_inlane_guide), false));
-	walls.push_back(CreateTableWall(ramp_outer, ARRAY_COUNT(ramp_outer), 0.1f));
-	walls.push_back(CreateTableWall(ramp_inner, ARRAY_COUNT(ramp_inner), 0.1f));
+
+	walls.push_back(CreateTableWall(ramp_outer_upper, ARRAY_COUNT(ramp_outer_upper), 0.1f));
+	walls.push_back(CreateTableWall(ramp_inner_upper, ARRAY_COUNT(ramp_inner_upper), 0.1f));
+
+	PhysBody* lower = CreateTableWall(ramp_outer_lower, ARRAY_COUNT(ramp_outer_lower), 0.1f);
+	lower->SetCollisionFilter(LAYER_RAMP, 0xFFFF);
+	walls.push_back(lower);
+	lower = CreateTableWall(ramp_inner_lower, ARRAY_COUNT(ramp_inner_lower), 0.1f);
+	lower->SetCollisionFilter(LAYER_RAMP, 0xFFFF);
+	walls.push_back(lower);
+
+	walls.push_back(CreateTableWall(left_outlane_wall, ARRAY_COUNT(left_outlane_wall), 0.1f));
+
 	walls.push_back(CreateTableWall(left_inlane_floor, ARRAY_COUNT(left_inlane_floor), 0.1f));
 	walls.push_back(CreateTableChain(right_wall, ARRAY_COUNT(right_wall), false));
 	walls.push_back(CreateTableWall(launch_wall, ARRAY_COUNT(launch_wall)));
@@ -717,8 +706,11 @@ void ModuleGame::SpawnBall()
 	int y = TableY(KICKER_Y) - TableLength(BALL_RADIUS) - 10;
 	ball = new Ball(App->physics, TableX(KICKER_X), y, TableLength(BALL_RADIUS));
 	ball_lost = false;
+	ball_on_ramp = false;
 
 	ApplyBallMaterial();
+
+	SetBallOnRamp(false);
 }
 
 void ModuleGame::ApplyBallMaterial()
@@ -738,6 +730,8 @@ void ModuleGame::DestroyBall()
 	sinkhole_entered = false;
 	sinkhole_timer = 0.0f;
 	sinkhole_cooldown = 0.0f;
+
+	ball_on_ramp = false;
 }
 
 void ModuleGame::AddScore(int points)
@@ -910,6 +904,7 @@ void ModuleGame::UpdatePlaying(float dt)
 	else if (ball != NULL)
 	{
 		UpdateSinkhole(dt);
+		UpdateBallLayer();
 	}
 }
 
@@ -1188,5 +1183,34 @@ void ModuleGame::DrawHud() const
 		DrawText(result, center_x - MeasureText(result, 28) / 2, 350, 28, text);
 		const char* next = TextFormat("Next round in %d...", (int)state_timer + 1);
 		DrawText(next, center_x - MeasureText(next, 20) / 2, 400, 20, text);
+	}
+}
+
+void ModuleGame::SetBallOnRamp(bool on)
+{
+	ball_on_ramp = on;
+	// On the table the ball ignores the lower ramp walls, on the ramp it collides with them
+	ball->body->SetCollisionFilter(LAYER_GROUND, on ? 0xFFFF : (0xFFFF & ~LAYER_RAMP));
+}
+
+void ModuleGame::UpdateBallLayer()
+{
+	int px, py;
+	ball->body->GetPosition(px, py);
+	float tx = (px - table_offset_x) / table_scale;	// back to table image pixels
+	float ty = py / table_scale;
+
+	if (!ball_on_ramp)
+	{
+		// Inside the funnel: it can only get there through the mouth
+		if (tx > 135.0f && tx < 165.0f && ty > 110.0f && ty < 190.0f)
+			SetBallOnRamp(true);
+	}
+	else
+	{
+		// Fell back out of the mouth (below the diagonal 197,205 -> 137,285) or left through the bottom ring
+		float outside = 80.0f * (tx - 197.0f) + 60.0f * (ty - 205.0f);
+		if ((tx > 140.0f && ty < 330.0f && outside > 2000.0f) || ty > 612.0f)
+			SetBallOnRamp(false);
 	}
 }
