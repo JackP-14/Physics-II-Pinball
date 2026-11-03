@@ -1,6 +1,6 @@
-# {Physics II Pinball, By SlopSquad TEam}
+# {Physics II Pinball, By SlopSquad Team}
 
-## Original Game
+## Original Game Link
 
 https://www.247pinball.com/halloween/
 
@@ -12,18 +12,18 @@ https://github.com/JackP-14/Physics-II-Pinball
 
 A recreation of a Pinball game built with Raylib for rendering and Box2D for handling the physics.
 
-## Key Features
-
- - {Feature01}
- - {Feature02}
- - {Feature03}
- - {Feature04}
- 
 ## Controls
 
- - F1 --> Debug
- - Left/Right Arrow -->  Left/Right Flippers
- - Down Arrow --> Kicker
+ - Left/Right Arrow  -->   Left/Right Flippers
+ - Down Arrow (Hold) -->   Kicker
+ - F1                -->   Debug
+ - F2/F3             -->   Increase/Decrease Target FPS
+ - F4/F5             -->   Increase/Decrease Gravity
+ - F6/F7             -->   Increase/Decrease Ball bounce
+ - F8/F9             -->   Increase/Decrease Ball friction
+ - F11               -->   Reset Settings
+
+## Differences with the Original
 
 ## Slopsquad Team Members:
 
