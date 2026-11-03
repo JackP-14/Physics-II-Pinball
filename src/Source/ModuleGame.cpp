@@ -208,6 +208,10 @@ static const int left_sling_bottom[] = { 177, 640, 227, 672 };
 static const int right_sling_face[] = { 472, 568, 425, 667 };
 static const int right_sling_bottom[] = { 474, 637, 425, 667 };
 
+// Thin purple lane dividers above the flippers (one on the left, one on the right): two-sided walls
+static const int left_lane_divider_1[] = { 96, 571, 96, 620 };
+static const int right_lane_divider[] = { 517, 571, 517, 650 };
+
 // Eye bumpers
 static const int bumper_positions[BUMPER_COUNT * 2] = {
 	397, 108,
@@ -592,6 +596,8 @@ void ModuleGame::CreateTable()
 	walls.push_back(CreateTableWall(launch_wall, ARRAY_COUNT(launch_wall)));
 	walls.push_back(CreateTableWall(left_sling_bottom, ARRAY_COUNT(left_sling_bottom)));
 	walls.push_back(CreateTableWall(right_sling_bottom, ARRAY_COUNT(right_sling_bottom)));
+	walls.push_back(CreateTableWall(left_lane_divider_1, ARRAY_COUNT(left_lane_divider_1), 0.1f));
+	walls.push_back(CreateTableWall(right_lane_divider, ARRAY_COUNT(right_lane_divider), 0.1f));
 
 	// Solid obstacles
 	walls.push_back(CreateTableChain(pumpkin, ARRAY_COUNT(pumpkin), true));
