@@ -25,11 +25,12 @@
 class PhysBody
 {
 public:
-	PhysBody() : body(NULL), joint(NULL), listener(NULL)
+	PhysBody() : body(NULL), joint(NULL), listener(NULL), vertical_damping(0.0f)
 	{
 	}
 
 	void GetPosition(int& x, int& y) const;
+	void GetLinearVelocity(float& vx, float& vy) const; // m/s
 	float GetRotation() const;
 	bool Contains(int x, int y) const;
 	int RayCast(int x1, int y1, int x2, int y2, float& normal_x, float& normal_y) const;
@@ -38,6 +39,9 @@ public:
 	void SetPosition(int x, int y);
 	void SetLinearVelocity(float vx, float vy); // m/s
 	void SetGravityScale(float scale);
+
+	// Like Box2D linear damping but only on the Y axis: the body keeps its horizontal speed
+	void SetVerticalDamping(float damping);
 
 	// Applied to every fixture of the body. Existing contacts keep the old value until they end
 	void SetRestitution(float restitution);
@@ -50,6 +54,9 @@ public:
 	b2Joint* joint;
 
 	Module* listener;
+
+	// Applied by ModulePhysics before every step (0 = none)
+	float vertical_damping;
 };
 
 // Module --------------------------------------
@@ -68,6 +75,7 @@ public:
 	PhysBody* CreateCircle(int x, int y, int radius);
 	PhysBody* CreateRectangle(int x, int y, int width, int height);
 	PhysBody* CreateRectangleSensor(int x, int y, int half_width, int half_height);
+	PhysBody* CreateCircleSensor(int x, int y, int radius);
 	// Chains are one-sided: they only collide on the LEFT of the walking direction (on screen).
 	// Smooth for rolling: use them for the outer walls and around solid obstacles
 	PhysBody* CreateChain(const int* points, int size, bool loop, float restitution = 0.2f);
@@ -89,6 +97,7 @@ public:
 	void DestroyBody(PhysBody* pbody);
 
 	void BeginContact(b2Contact* contact) override;
+	void EndContact(b2Contact* contact) override;
 
 	bool IsDebug() const { return debug; }
 
@@ -97,6 +106,7 @@ public:
 	float GetGravity() const;
 
 private:
+	void ApplyVerticalDamping();
 	void DrawDebug();
 	void UpdateMouseJoint();
 

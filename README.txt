@@ -34,27 +34,41 @@ CONTROLS
  F8 / F9 ........... lower / raise the ball friction (0.0 - 1.0)
  F11 ............... reset gravity, bounciness and friction to their defaults
 
+TABLE
+-----
+ - Coffin flippers and a spring kicker (the spring compresses while you pull it).
+ - Two pumpkin bumpers and two spider web slingshots.
+ - Cauldron lane (top left): the ball rolls UNDER the cauldron, down the slime lane, and the
+   cauldron spits it back towards the center of the table. Reaching it straight from the
+   kicker is a skill shot (points, but it does not count for the combo).
+ - Ball save: during the first 15 seconds after a launch, a lost ball is given back once.
+ - Kickback (left outlane): once per ball it shoots the ball back up into the playfield.
+   The green arrow in the outlane shows it is ready.
+ - The letters D, N, M, L float over the table: collect them all for an extra ball. Collected
+   letters are kept from one ball to the next (they reset when a new round starts).
+ - Big spider web (top left): the ball gets stuck in it for a moment. It falls very slowly
+   (vertical damping and low gravity) but keeps its sideways speed, then the web lets it go.
+
 SCORING
 -------
- Eye bumpers ................................ 100
+ Pumpkin bumpers ............................ 100
  Slingshots ................................. 10
- Pumpkin slot / candy card (first hit) ...... 250   (50 if already lit)
- Sinkhole next to the tombstone ............. 500   (holds the ball and spits it out)
+ Cauldron lane .............................. 500
+ Skill shot (cauldron lane straight from the kicker) ... 750
+ Stuck in the spider web .................... 300
+ Letter ..................................... 150
+ Lighting a combo element (first time) ...... 250
 
- COMBOS
- Carve the Pumpkin: hit the 3 slots under the pumpkin ... +1000 and an EXTRA BALL (max 5)
- Candy cards: hit the 3 cards under the third eye ....... +2000
+ COMBOS (extra balls, max 5)
+ Trick or Treat: hit both pumpkins and go through the cauldron lane
+ (after the ball has touched a flipper) ..... +1500 and an EXTRA BALL
+ DNML: collect the 4 letters ................ +1000 and an EXTRA BALL
 
 The game shows the current score, the previous round score and the highest score of the session.
 
 DIFFERENCES WITH THE ORIGINAL
 -----------------------------
- - The ramps (bone ramp on the left and the end of the orange ramp on the right) are drawn
-   but act as walls: the ball cannot ride them.
- - The launch lane follows the orange band around the top and drops the ball above the pumpkin.
- - The outlanes and the bottom-left / bottom-right posts are not reachable.
- - "Shoot Again" and the ball counter painted on the table are decorative; the HUD on the
-   left shows the balls left instead.
- - The cauldron, bat and tombstone are solid obstacles without special rules.
- - Added: sinkhole that holds the ball, candy card bonus, runtime physics settings and FPS control.
- - Sound effects are our own (synthesized), except bonus.wav.
+ - The table art is our own Halloween design, drawn for this project; it keeps the classic
+   layout (two flippers, slingshots, inlanes/outlanes, plunger lane on the right).
+ - Added: cauldron lane, sticky spider web, runtime physics settings and FPS control.
+ - Sound effects are our own (synthesized).

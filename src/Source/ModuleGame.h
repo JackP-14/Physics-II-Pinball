@@ -15,14 +15,16 @@ class Kicker;
 #define MAX_BALLS 5
 #define BALL_RESPAWN_TIME 1.0f // seconds between losing a ball and getting the next one
 #define ROUND_OVER_TIME 4.0f   // seconds the round summary is shown before the next round starts
-#define TARGET_COUNT 3         // targets in each bank (pumpkin and candy)
-#define BUMPER_COUNT 3
+#define BALL_SAVE_TIME 15.0f   // seconds after a launch during which a lost ball is given back
+#define TARGET_COUNT 3         // elements of the "Trick or Treat" combo
+#define BUMPER_COUNT 2
 #define SLINGSHOT_COUNT 2
+#define LETTER_COUNT 4         // letters spread over the table: all of them give an extra ball
 
 // A bank of targets: hitting all of them completes the combo
 struct TargetBank
 {
-	PhysBody* sensors[TARGET_COUNT];
+	PhysBody* bodies[TARGET_COUNT];
 	bool lit[TARGET_COUNT];
 
 	int LitCount() const;
@@ -48,11 +50,12 @@ public:
 	bool CleanUp();
 
 	void OnCollision(PhysBody* bodyA, PhysBody* bodyB) override;
+	void OnCollisionEnd(PhysBody* bodyA, PhysBody* bodyB) override;
 
 	void AddScore(int points);
 
 private:
-	// Table layout is authored in background image pixels: these convert it to screen pixels
+	// Table layout is authored in table image pixels: these convert it to screen pixels
 	int TableX(float x) const;
 	int TableY(float y) const;
 	int TableLength(float length) const;
@@ -72,7 +75,13 @@ private:
 	void HandleSettingsInput();
 	void ApplyBallMaterial();
 	void UpdatePlaying(float dt);
-	void UpdateSinkhole(float dt);
+	void UpdateWeb(float dt);
+	void ReleaseFromWeb();
+	void UpdateCauldron();
+	void UpdateKickback();
+	void ResetLetters();
+	void CollectLetter(int index);
+	void GiveExtraBall(const char* text);
 	void UpdateEffects(float dt);
 
 	// Returns true when the hit completed the bank
@@ -97,7 +106,10 @@ private:
 	PhysBody* bumpers[BUMPER_COUNT];
 	PhysBody* slingshots[SLINGSHOT_COUNT];
 	PhysBody* drain;
-	PhysBody* sinkhole;
+	PhysBody* web;           // big spider web: the ball gets stuck in it
+	PhysBody* cauldron_lane; // sensor at the end of the lane under the cauldron
+	PhysBody* kickback;      // sensor in the left outlane
+	PhysBody* letters[LETTER_COUNT];
 	Flipper* left_flipper;
 	Flipper* right_flipper;
 	Kicker* kicker;
@@ -105,21 +117,31 @@ private:
 
 	// Set inside the contact callbacks (the world is locked), handled in Update()
 	bool ball_lost;
-	bool sinkhole_entered;
+	bool web_entered;
+	bool web_exited;
+	bool cauldron_entered;
+	bool kickback_entered;
+	bool kickback_armed; // once per ball: shoots the ball back up from the left outlane
+	bool ball_touched_flipper; // false right after a launch: a lane shot from the kicker is a skill shot
 
-	// Combos
-	TargetBank pumpkin_targets; // "Carve the Pumpkin": all three give an extra ball
-	TargetBank candy_targets;   // candy cards: all three give a bonus
-	float sinkhole_timer;       // > 0 while the ball is held in the sinkhole
-	float sinkhole_cooldown;    // the ball cannot be captured again right after leaving
+	// Ball save: a ball lost right after its launch is given back once
+	bool ball_launched;  // the ball has left the kicker lane
+	bool ball_save_used; // the current ball is already a saved one
+	float ball_save_timer;
+
+	// Combos and special zones
+	TargetBank trick_or_treat; // both pumpkins + the cauldron lane: extra ball
+	float web_timer;           // > 0 while the ball is stuck in the web
+	float web_cooldown;        // the web cannot catch the ball again right after releasing it
+	bool letter_collected[LETTER_COUNT];
 
 	// Physics settings the player can change at runtime (gravity lives in ModulePhysics)
 	float ball_restitution;
 	float ball_friction;
 
 	// Visual feedback
-	float bumper_flash[BUMPER_COUNT];
 	float slingshot_flash[SLINGSHOT_COUNT];
+	float cauldron_flash;
 	const char* message;
 	float message_timer;
 
@@ -129,18 +151,21 @@ private:
 	uint32 fx_flipper;
 	uint32 fx_kicker;
 	uint32 fx_target;
-	uint32 fx_hole;
+	uint32 fx_cauldron;
+	uint32 fx_web;
 	uint32 fx_drain;
 	uint32 fx_extra_ball;
-	uint32 fx_bonus;
 	uint32 fx_round_over;
+	uint32 fx_pickup;
 
-	// Background placement
+	// Table placement on screen
 	float table_scale;
 	float table_offset_x;
 
-	// Assets
+	// Assets: every table image has the size of the table (sprites are drawn in place)
 	Texture2D background_tex;
 	Texture2D flipper_tex;
-	Texture2D kicker_tex;
+	Texture2D spring_tex;
+	Texture2D cauldron_tex;
+	Texture2D letters_tex;
 };

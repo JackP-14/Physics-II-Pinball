@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Force (Join-Path $stage "Assets\Audio\Fx") | Out-N
 Copy-Item (Join-Path $src "Build\PhysicsGame\Release\Win32\PhysicsGame.exe") (Join-Path $stage "HalloweenPinball.exe")
 
 # Only the assets the game loads
-$assets = @("table_background.png", "bumpers.png", "shooter.png", "bonus.wav")
+$assets = @("fondo.png", "ataud.png", "spring.png", "caldero.png", "letras.png")
 foreach ($a in $assets) { Copy-Item (Join-Path $src "Assets\$a") (Join-Path $stage "Assets\$a") }
 Copy-Item (Join-Path $src "Assets\Audio\Fx\*.wav") (Join-Path $stage "Assets\Audio\Fx")
 

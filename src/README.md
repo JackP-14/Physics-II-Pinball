@@ -9,10 +9,14 @@ Pinball made for Physics II (Project 01: Classic Physics) with **Box2D v2.4.1** 
 
 ## Key Features
 
- - Flippers (revolute joints with motor and limits) and a kicker (prismatic joint) whose power depends on how long it is pulled
- - Table walls built with Box2D chains traced over the original art; bumpers and slingshots with restitution > 1
+ - Coffin flippers (revolute joints with motor and limits) and a spring kicker (prismatic joint, animated spring) whose power depends on how long it is pulled
+ - Table walls built with Box2D chains traced over our own table art; pumpkin bumpers (restitution 0.9) and slingshots (0.6)
  - Rounds of 3 balls with current, previous and highest score of the session; rounds cycle automatically
- - Combos: *Carve the Pumpkin* (extra ball) and candy cards (bonus); sinkhole that holds and ejects the ball
+ - Combo *Trick or Treat* (both pumpkins + cauldron lane = extra ball); lane that passes under the cauldron, which spits the ball back into play (skill shot when coming straight from the kicker)
+ - 4 collectible letters (D, N, M, L) spread over the table, kept between balls: all of them = extra ball
+ - Sticky spider web: a sensor that applies vertical-only damping (custom, per physics step) and lowers the ball's gravity scale until it lets the ball go
+ - Ball save: a ball lost in the first 15 seconds after its launch is given back once
+ - Kickback in the left outlane: once per ball it shoots the ball back up into the playfield
  - Fixed-timestep physics: the target FPS can be changed without slowing down or speeding up the simulation
  - Runtime settings for gravity, ball restitution and ball friction
  - Debug mode (F1) drawing every shape, with a mouse joint to drag bodies

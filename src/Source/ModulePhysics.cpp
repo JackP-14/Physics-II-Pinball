@@ -10,7 +10,7 @@
 // Flippers
 #define FLIPPER_MOTOR_SPEED 20.0f     // rad/s
 #define FLIPPER_MOTOR_TORQUE 1500.0f  // N*m
-#define FLIPPER_REST_ANGLE 33.0f      // degrees below the horizontal (as painted on the table)
+#define FLIPPER_REST_ANGLE 31.0f      // degrees below the horizontal (as the coffin sprite is drawn)
 #define FLIPPER_SWING_ANGLE 60.0f     // degrees it travels when pressed
 
 // Kicker
@@ -61,11 +61,27 @@ update_status ModulePhysics::PreUpdate()
 
 	while (time_accumulator >= PHYSICS_TIMESTEP)
 	{
+		ApplyVerticalDamping();
 		world->Step(PHYSICS_TIMESTEP, 8, 3);
 		time_accumulator -= PHYSICS_TIMESTEP;
 	}
 
 	return UPDATE_CONTINUE;
+}
+
+void ModulePhysics::ApplyVerticalDamping()
+{
+	// Same formula Box2D uses for its linear damping, v *= 1 / (1 + h * c), but only on Y
+	for (b2Body* b = world->GetBodyList(); b; b = b->GetNext())
+	{
+		PhysBody* pbody = (PhysBody*)b->GetUserData().pointer;
+		if (pbody == NULL || pbody->vertical_damping <= 0.0f)
+			continue;
+
+		b2Vec2 velocity = b->GetLinearVelocity();
+		velocity.y *= 1.0f / (1.0f + PHYSICS_TIMESTEP * pbody->vertical_damping);
+		b->SetLinearVelocity(velocity);
+	}
 }
 
 update_status ModulePhysics::PostUpdate()
@@ -302,6 +318,30 @@ PhysBody* ModulePhysics::CreateRectangleSensor(int x, int y, int half_width, int
 
 	b2FixtureDef fixture;
 	fixture.shape = &box;
+	fixture.isSensor = true;
+	b->CreateFixture(&fixture);
+
+	pbody->body = b;
+
+	return pbody;
+}
+
+PhysBody* ModulePhysics::CreateCircleSensor(int x, int y, int radius)
+{
+	PhysBody* pbody = new PhysBody();
+
+	b2BodyDef body;
+	body.type = b2_staticBody;
+	body.position.Set(PIXEL_TO_METER(x), PIXEL_TO_METER(y));
+	body.userData.pointer = reinterpret_cast<uintptr_t>(pbody);
+
+	b2Body* b = world->CreateBody(&body);
+
+	b2CircleShape shape;
+	shape.m_radius = PIXEL_TO_METER(radius);
+
+	b2FixtureDef fixture;
+	fixture.shape = &shape;
 	fixture.isSensor = true;
 	b->CreateFixture(&fixture);
 
@@ -583,12 +623,31 @@ void ModulePhysics::BeginContact(b2Contact* contact)
 		b->listener->OnCollision(b, a);
 }
 
+void ModulePhysics::EndContact(b2Contact* contact)
+{
+	PhysBody* a = (PhysBody*)contact->GetFixtureA()->GetBody()->GetUserData().pointer;
+	PhysBody* b = (PhysBody*)contact->GetFixtureB()->GetBody()->GetUserData().pointer;
+
+	if (a != NULL && a->listener != NULL)
+		a->listener->OnCollisionEnd(a, b);
+
+	if (b != NULL && b->listener != NULL)
+		b->listener->OnCollisionEnd(b, a);
+}
+
 // PhysBody ------------------------------------
 void PhysBody::GetPosition(int& x, int& y) const
 {
 	b2Vec2 pos = body->GetPosition();
 	x = METER_TO_PIXEL(pos.x);
 	y = METER_TO_PIXEL(pos.y);
+}
+
+void PhysBody::GetLinearVelocity(float& vx, float& vy) const
+{
+	b2Vec2 velocity = body->GetLinearVelocity();
+	vx = velocity.x;
+	vy = velocity.y;
 }
 
 float PhysBody::GetRotation() const
@@ -612,6 +671,12 @@ void PhysBody::SetLinearVelocity(float vx, float vy)
 void PhysBody::SetGravityScale(float scale)
 {
 	body->SetGravityScale(scale);
+}
+
+void PhysBody::SetVerticalDamping(float damping)
+{
+	vertical_damping = damping;
+	body->SetAwake(true);
 }
 
 void PhysBody::SetRestitution(float restitution)
